@@ -810,7 +810,7 @@ static INT_PTR CALLBACK AboutDlgProc( HWND hWnd, UINT msg, WPARAM wParam,
         {
             ABOUT_INFO *info = (ABOUT_INFO *)lParam;
             WCHAR template[512], buffer[512], version[64];
-            extern const char *wine_get_build_id(void);
+            extern FARCALL const char *wine_get_build_id(void);
 
             if (info)
             {

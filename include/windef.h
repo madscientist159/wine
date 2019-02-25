@@ -50,6 +50,13 @@ extern "C" {
 # endif
 #endif
 
+#if defined(__powerpc64__) && defined (__GNUC__)
+  /* ppc64 relies on long calls being generated for calls crossing DLL boundaries (r2 save / restore) */
+# define FARCALL __attribute__((__longcall__))
+#else
+# define FARCALL
+#endif
+
 #ifndef __stdcall
 # ifdef __i386__
 #  ifdef __GNUC__
