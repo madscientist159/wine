@@ -277,10 +277,15 @@ static void create_hardware_registry_keys(void)
     static const WCHAR ProcessorNameStringW[] = {'P','r','o','c','e','s','s','o','r','N','a','m','e','S','t','r','i','n','g',0};
     static const WCHAR SysidW[] = {'A','T',' ','c','o','m','p','a','t','i','b','l','e',0};
     static const WCHAR ARMSysidW[] = {'A','R','M',' ','p','r','o','c','e','s','s','o','r',' ','f','a','m','i','l','y',0};
+    static const WCHAR PPCSysidW[] = {'P','o','w','e','r','P','C',' ','p','r','o','c','e','s','s','o','r',' ','f','a','m','i','l','y',0};
     static const WCHAR mhzKeyW[] = {'~','M','H','z',0};
     static const WCHAR VendorIdentifierW[] = {'V','e','n','d','o','r','I','d','e','n','t','i','f','i','e','r',0};
     static const WCHAR PercentDW[] = {'%','d',0};
     static const WCHAR ARMCpuDescrW[]  = {'A','R','M',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
+                                          ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
+    static const WCHAR PPCCpuDescrW[]  = {'P','o','w','e','r','P','C',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
+                                          ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
+    static const WCHAR PPC64CpuDescrW[]  = {'P','o','w','e','r','P','C','6','4',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
                                           ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
     static const WCHAR x86W[] = {'x','8','6',0};
     static const WCHAR intel64W[] = {'I','n','t','e','l','6','4',0};
@@ -310,6 +315,13 @@ static void create_hardware_registry_keys(void)
         sprintfW( id, ARMCpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
         break;
 
+    case PROCESSOR_ARCHITECTURE_PPC:
+        sprintfW( id, PPCCpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
+        break;
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        sprintfW( id, PPC64CpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
+        break;
+
     case PROCESSOR_ARCHITECTURE_AMD64:
         get_identifier( id, !strcmpW(vendorid, authenticamdW) ? amd64W : intel64W );
         break;
@@ -332,6 +344,11 @@ static void create_hardware_registry_keys(void)
     case PROCESSOR_ARCHITECTURE_ARM:
     case PROCESSOR_ARCHITECTURE_ARM64:
         set_reg_value( system_key, IdentifierW, ARMSysidW );
+        break;
+
+    case PROCESSOR_ARCHITECTURE_PPC:
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        set_reg_value( system_key, IdentifierW, PPCSysidW );
         break;
 
     case PROCESSOR_ARCHITECTURE_INTEL:
@@ -411,6 +428,7 @@ static void create_environment_registry_keys( void )
     static const WCHAR intel64W[]  = {'I','n','t','e','l','6','4',0};
     static const WCHAR amd64W[]    = {'A','M','D','6','4',0};
     static const WCHAR authenticamdW[] = {'A','u','t','h','e','n','t','i','c','A','M','D',0};
+    static const WCHAR ppc64W[]    = {'P','o','w','e','r','P','C','6','4',0};
     static const WCHAR commaW[]    = {',',' ',0};
     static const WCHAR ProcIdW[]   = {'P','R','O','C','E','S','S','O','R','_','I','D','E','N','T','I','F','I','E','R',0};
     static const WCHAR ProcLvlW[]  = {'P','R','O','C','E','S','S','O','R','_','L','E','V','E','L',0};
@@ -418,6 +436,10 @@ static void create_environment_registry_keys( void )
     static const WCHAR PercentDW[] = {'%','d',0};
     static const WCHAR Percent04XW[] = {'%','0','4','x',0};
     static const WCHAR ARMCpuDescrW[]  = {'A','R','M',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
+                                          ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
+    static const WCHAR PPCCpuDescrW[]  = {'P','o','w','e','r','P','C',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
+                                          ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
+    static const WCHAR PPC64CpuDescrW[]  = {'P','o','w','e','r','P','C','6','4',' ','F','a','m','i','l','y',' ','%','d',' ','M','o','d','e','l',' ','%','d',
                                           ' ','R','e','v','i','s','i','o','n',' ','%','d',0};
     HKEY env_key;
     SYSTEM_CPU_INFORMATION sci;
@@ -439,6 +461,10 @@ static void create_environment_registry_keys( void )
         parch = !strcmpW(vendorid, authenticamdW) ? amd64W : intel64W;
         break;
 
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        arch = parch = ppc64W;
+        break;
+
     case PROCESSOR_ARCHITECTURE_INTEL:
     default:
         arch = parch = x86W;
@@ -451,6 +477,13 @@ static void create_environment_registry_keys( void )
     case PROCESSOR_ARCHITECTURE_ARM:
     case PROCESSOR_ARCHITECTURE_ARM64:
         sprintfW( buffer, ARMCpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
+        break;
+
+    case PROCESSOR_ARCHITECTURE_PPC:
+        sprintfW( buffer, PPCCpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
+        break;
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        sprintfW( buffer, PPC64CpuDescrW, sci.Level, HIBYTE(sci.Revision), LOBYTE(sci.Revision) );
         break;
 
     case PROCESSOR_ARCHITECTURE_AMD64:

@@ -719,6 +719,8 @@ static BOOL CALLBACK register_manifest( HMODULE module, const WCHAR *type, WCHAR
     static const char current_arch[] = "arm";
 #elif defined __aarch64__
     static const char current_arch[] = "arm64";
+#elif defined __powerpc64__
+    static const char current_arch[] = "ppc64";
 #else
     static const char current_arch[] = "none";
 #endif
