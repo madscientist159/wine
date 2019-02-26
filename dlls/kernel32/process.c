@@ -111,7 +111,7 @@ static WCHAR winevdm[] = {'C',':','\\','w','i','n','d','o','w','s',
                           '\\','s','y','s','t','e','m','3','2',
                           '\\','w','i','n','e','v','d','m','.','e','x','e',0};
 
-static const char * const cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64" };
+static const char * const cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64","PowerPC 64" };
 
 static void exec_process( LPCWSTR name );
 
@@ -173,7 +173,7 @@ static inline unsigned int is_path_prefix( const WCHAR *prefix, const WCHAR *fil
  */
 static inline BOOL is_64bit_arch( cpu_type_t cpu )
 {
-    return (cpu == CPU_x86_64 || cpu == CPU_ARM64);
+    return (cpu == CPU_x86_64 || cpu == CPU_ARM64 || cpu == CPU_POWERPC64);
 }
 
 
@@ -286,6 +286,7 @@ static enum binary_type get_binary_info( HANDLE hfile, pe_image_info_t *info )
         {
         case 3:   info->cpu = CPU_x86; break;
         case 20:  info->cpu = CPU_POWERPC; break;
+        case 22:  info->cpu = CPU_POWERPC64; break;
         case 40:  info->cpu = CPU_ARM; break;
         case 62:  info->cpu = CPU_x86_64; break;
         case 183: info->cpu = CPU_ARM64; break;
@@ -338,6 +339,7 @@ static enum binary_type get_binary_info( HANDLE hfile, pe_image_info_t *info )
         case 0x0000000c: info->cpu = CPU_ARM; break;
         case 0x0100000c: info->cpu = CPU_ARM64; break;
         case 0x00000012: info->cpu = CPU_POWERPC; break;
+        case 0x00000014: info->cpu = CPU_POWERPC64; break;
         }
         switch(header.macho.filetype)
         {
@@ -2716,6 +2718,8 @@ BOOL WINAPI CreateProcessInternalW( HANDLE token, LPCWSTR app_name, LPWSTR cmd_l
         /* assume current arch */
 #if defined(__i386__) || defined(__x86_64__)
         pe_info.cpu = is_64bit ? CPU_x86_64 : CPU_x86;
+#elif defined(__powerpc64__)
+        pe_info.cpu = CPU_POWERPC64;
 #elif defined(__powerpc__)
         pe_info.cpu = CPU_POWERPC;
 #elif defined(__arm__)

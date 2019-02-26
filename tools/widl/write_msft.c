@@ -2159,7 +2159,7 @@ static void add_union_typeinfo(msft_typelib_t *typelib, type_t *tunion)
     var_t *cur;
     msft_typeinfo_t *msft_typeinfo;
 
-    if (-1 < tunion->typelib_idx)
+    if (-1 <= tunion->typelib_idx)
         return;
 
     tunion->typelib_idx = typelib->typelib_header.nrtypeinfos;

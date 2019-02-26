@@ -145,6 +145,9 @@ VOID WINAPI GetSystemInfo(
         default: si->dwProcessorType = 0;
         }
         break;
+    case PROCESSOR_ARCHITECTURE_PPC64:
+        si->dwProcessorType = PROCESSOR_PPC64_OP;
+        break;
     case PROCESSOR_ARCHITECTURE_AMD64:
         si->dwProcessorType = PROCESSOR_AMD_X8664;
         break;

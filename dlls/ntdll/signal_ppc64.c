@@ -2,6 +2,7 @@
  * PowerPC signal handling routines
  *
  * Copyright 2002 Marcus Meissner, SuSE Linux AG
+ * Copyright 2019 Timothy Pearson <tpearson@raptorengineering.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,7 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#if defined(__powerpc__) && !defined(__powerpc64__)
+#ifdef __powerpc64__
 
 #include "config.h"
 #include "wine/port.h"
@@ -95,56 +96,6 @@ static pthread_key_t teb_key;
 
 #endif /* linux */
 
-#ifdef __APPLE__
-
-/* All Registers access - only for local access */
-# define REG_sig(reg_name, context)		((context)->uc_mcontext->ss.reg_name)
-# define FLOATREG_sig(reg_name, context)	((context)->uc_mcontext->fs.reg_name)
-# define EXCEPREG_sig(reg_name, context)	((context)->uc_mcontext->es.reg_name)
-# define VECREG_sig(reg_name, context)		((context)->uc_mcontext->vs.reg_name)
-
-/* Gpr Registers access */
-# define GPR_sig(reg_num, context)		REG_sig(r##reg_num, context)
-
-# define IAR_sig(context)			REG_sig(srr0, context)	/* Program counter */
-# define MSR_sig(context)			REG_sig(srr1, context)  /* Machine State Register (Supervisor) */
-# define CTR_sig(context)			REG_sig(ctr, context)
-
-# define XER_sig(context)			REG_sig(xer, context) /* Link register */
-# define LR_sig(context)			REG_sig(lr, context)  /* User's integer exception register */
-# define CR_sig(context)			REG_sig(cr, context)  /* Condition register */
-
-/* Float Registers access */
-# define FLOAT_sig(reg_num, context)		FLOATREG_sig(fpregs[reg_num], context)
-
-# define FPSCR_sig(context)			FLOATREG_sig(fpscr, context)
-
-/* Exception Registers access */
-# define DAR_sig(context)			EXCEPREG_sig(dar, context)     /* Fault registers for coredump */
-# define DSISR_sig(context)			EXCEPREG_sig(dsisr, context)
-# define TRAP_sig(context)			EXCEPREG_sig(exception, context) /* number of powerpc exception taken */
-
-/* Signal defs : Those are undefined on darwin
-SIGBUS
-#undef BUS_ADRERR
-#undef BUS_OBJERR
-SIGILL
-#undef ILL_ILLOPN
-#undef ILL_ILLTRP
-#undef ILL_ILLADR
-#undef ILL_COPROC
-#undef ILL_PRVREG
-#undef ILL_BADSTK
-SIGTRAP
-#undef TRAP_BRKPT
-#undef TRAP_TRACE
-SIGFPE
-*/
-
-#endif /* __APPLE__ */
-
-
-
 typedef int (*wine_signal_handler)(unsigned int sig);
 
 static wine_signal_handler handlers[256];
@@ -177,11 +128,11 @@ static void save_context( CONTEXT *context, const ucontext_t *sigcontext )
 	context->Iar = IAR_sig(sigcontext);  /* Program Counter */
 	context->Msr = MSR_sig(sigcontext);  /* Machine State Register (Supervisor) */
 	context->Ctr = CTR_sig(sigcontext);
-        
+
         context->Xer = XER_sig(sigcontext);
 	context->Lr  = LR_sig(sigcontext);
 	context->Cr  = CR_sig(sigcontext);
-        
+
         /* Saving Exception regs */
         context->Dar   = DAR_sig(sigcontext);
         context->Dsisr = DSISR_sig(sigcontext);
@@ -207,11 +158,11 @@ static void restore_context( const CONTEXT *context, ucontext_t *sigcontext )
         IAR_sig(sigcontext) = context->Iar;  /* Program Counter */
         MSR_sig(sigcontext) = context->Msr;  /* Machine State Register (Supervisor) */
         CTR_sig(sigcontext) = context->Ctr;
-        
+
         XER_sig(sigcontext) = context->Xer;
         LR_sig(sigcontext) = context->Lr;
 	CR_sig(sigcontext) = context->Cr;
-        
+
         /* Setting Exception regs */
         DAR_sig(sigcontext) = context->Dar;
         DSISR_sig(sigcontext) = context->Dsisr;
@@ -394,93 +345,93 @@ NTSTATUS context_to_server( context_t *to, const CONTEXT *from )
     DWORD flags = from->ContextFlags;  /* no CPU id? */
 
     memset( to, 0, sizeof(*to) );
-    to->cpu = CPU_POWERPC;
+    to->cpu = CPU_POWERPC64;
 
     if (flags & CONTEXT_CONTROL)
     {
         to->flags |= SERVER_CTX_CONTROL;
-        to->ctl.powerpc_regs.iar   = from->Iar;
-        to->ctl.powerpc_regs.msr   = from->Msr;
-        to->ctl.powerpc_regs.ctr   = from->Ctr;
-        to->ctl.powerpc_regs.lr    = from->Lr;
-        to->ctl.powerpc_regs.dar   = from->Dar;
-        to->ctl.powerpc_regs.dsisr = from->Dsisr;
-        to->ctl.powerpc_regs.trap  = from->Trap;
+        to->ctl.powerpc64_regs.iar   = from->Iar;
+        to->ctl.powerpc64_regs.msr   = from->Msr;
+        to->ctl.powerpc64_regs.ctr   = from->Ctr;
+        to->ctl.powerpc64_regs.lr    = from->Lr;
+        to->ctl.powerpc64_regs.dar   = from->Dar;
+        to->ctl.powerpc64_regs.dsisr = from->Dsisr;
+        to->ctl.powerpc64_regs.trap  = from->Trap;
     }
     if (flags & CONTEXT_INTEGER)
     {
         to->flags |= SERVER_CTX_INTEGER;
-        to->integer.powerpc_regs.gpr[0]  = from->Gpr0;
-        to->integer.powerpc_regs.gpr[1]  = from->Gpr1;
-        to->integer.powerpc_regs.gpr[2]  = from->Gpr2;
-        to->integer.powerpc_regs.gpr[3]  = from->Gpr3;
-        to->integer.powerpc_regs.gpr[4]  = from->Gpr4;
-        to->integer.powerpc_regs.gpr[5]  = from->Gpr5;
-        to->integer.powerpc_regs.gpr[6]  = from->Gpr6;
-        to->integer.powerpc_regs.gpr[7]  = from->Gpr7;
-        to->integer.powerpc_regs.gpr[8]  = from->Gpr8;
-        to->integer.powerpc_regs.gpr[9]  = from->Gpr9;
-        to->integer.powerpc_regs.gpr[10] = from->Gpr10;
-        to->integer.powerpc_regs.gpr[11] = from->Gpr11;
-        to->integer.powerpc_regs.gpr[12] = from->Gpr12;
-        to->integer.powerpc_regs.gpr[13] = from->Gpr13;
-        to->integer.powerpc_regs.gpr[14] = from->Gpr14;
-        to->integer.powerpc_regs.gpr[15] = from->Gpr15;
-        to->integer.powerpc_regs.gpr[16] = from->Gpr16;
-        to->integer.powerpc_regs.gpr[17] = from->Gpr17;
-        to->integer.powerpc_regs.gpr[18] = from->Gpr18;
-        to->integer.powerpc_regs.gpr[19] = from->Gpr19;
-        to->integer.powerpc_regs.gpr[20] = from->Gpr20;
-        to->integer.powerpc_regs.gpr[21] = from->Gpr21;
-        to->integer.powerpc_regs.gpr[22] = from->Gpr22;
-        to->integer.powerpc_regs.gpr[23] = from->Gpr23;
-        to->integer.powerpc_regs.gpr[24] = from->Gpr24;
-        to->integer.powerpc_regs.gpr[25] = from->Gpr25;
-        to->integer.powerpc_regs.gpr[26] = from->Gpr26;
-        to->integer.powerpc_regs.gpr[27] = from->Gpr27;
-        to->integer.powerpc_regs.gpr[28] = from->Gpr28;
-        to->integer.powerpc_regs.gpr[29] = from->Gpr29;
-        to->integer.powerpc_regs.gpr[30] = from->Gpr30;
-        to->integer.powerpc_regs.gpr[31] = from->Gpr31;
-        to->integer.powerpc_regs.xer     = from->Xer;
-        to->integer.powerpc_regs.cr      = from->Cr;
+        to->integer.powerpc64_regs.gpr[0]  = from->Gpr0;
+        to->integer.powerpc64_regs.gpr[1]  = from->Gpr1;
+        to->integer.powerpc64_regs.gpr[2]  = from->Gpr2;
+        to->integer.powerpc64_regs.gpr[3]  = from->Gpr3;
+        to->integer.powerpc64_regs.gpr[4]  = from->Gpr4;
+        to->integer.powerpc64_regs.gpr[5]  = from->Gpr5;
+        to->integer.powerpc64_regs.gpr[6]  = from->Gpr6;
+        to->integer.powerpc64_regs.gpr[7]  = from->Gpr7;
+        to->integer.powerpc64_regs.gpr[8]  = from->Gpr8;
+        to->integer.powerpc64_regs.gpr[9]  = from->Gpr9;
+        to->integer.powerpc64_regs.gpr[10] = from->Gpr10;
+        to->integer.powerpc64_regs.gpr[11] = from->Gpr11;
+        to->integer.powerpc64_regs.gpr[12] = from->Gpr12;
+        to->integer.powerpc64_regs.gpr[13] = from->Gpr13;
+        to->integer.powerpc64_regs.gpr[14] = from->Gpr14;
+        to->integer.powerpc64_regs.gpr[15] = from->Gpr15;
+        to->integer.powerpc64_regs.gpr[16] = from->Gpr16;
+        to->integer.powerpc64_regs.gpr[17] = from->Gpr17;
+        to->integer.powerpc64_regs.gpr[18] = from->Gpr18;
+        to->integer.powerpc64_regs.gpr[19] = from->Gpr19;
+        to->integer.powerpc64_regs.gpr[20] = from->Gpr20;
+        to->integer.powerpc64_regs.gpr[21] = from->Gpr21;
+        to->integer.powerpc64_regs.gpr[22] = from->Gpr22;
+        to->integer.powerpc64_regs.gpr[23] = from->Gpr23;
+        to->integer.powerpc64_regs.gpr[24] = from->Gpr24;
+        to->integer.powerpc64_regs.gpr[25] = from->Gpr25;
+        to->integer.powerpc64_regs.gpr[26] = from->Gpr26;
+        to->integer.powerpc64_regs.gpr[27] = from->Gpr27;
+        to->integer.powerpc64_regs.gpr[28] = from->Gpr28;
+        to->integer.powerpc64_regs.gpr[29] = from->Gpr29;
+        to->integer.powerpc64_regs.gpr[30] = from->Gpr30;
+        to->integer.powerpc64_regs.gpr[31] = from->Gpr31;
+        to->integer.powerpc64_regs.xer     = from->Xer;
+        to->integer.powerpc64_regs.cr      = from->Cr;
     }
     if (flags & CONTEXT_FLOATING_POINT)
     {
         to->flags |= SERVER_CTX_FLOATING_POINT;
-        to->fp.powerpc_regs.fpr[0]  = from->Fpr0;
-        to->fp.powerpc_regs.fpr[1]  = from->Fpr1;
-        to->fp.powerpc_regs.fpr[2]  = from->Fpr2;
-        to->fp.powerpc_regs.fpr[3]  = from->Fpr3;
-        to->fp.powerpc_regs.fpr[4]  = from->Fpr4;
-        to->fp.powerpc_regs.fpr[5]  = from->Fpr5;
-        to->fp.powerpc_regs.fpr[6]  = from->Fpr6;
-        to->fp.powerpc_regs.fpr[7]  = from->Fpr7;
-        to->fp.powerpc_regs.fpr[8]  = from->Fpr8;
-        to->fp.powerpc_regs.fpr[9]  = from->Fpr9;
-        to->fp.powerpc_regs.fpr[10] = from->Fpr10;
-        to->fp.powerpc_regs.fpr[11] = from->Fpr11;
-        to->fp.powerpc_regs.fpr[12] = from->Fpr12;
-        to->fp.powerpc_regs.fpr[13] = from->Fpr13;
-        to->fp.powerpc_regs.fpr[14] = from->Fpr14;
-        to->fp.powerpc_regs.fpr[15] = from->Fpr15;
-        to->fp.powerpc_regs.fpr[16] = from->Fpr16;
-        to->fp.powerpc_regs.fpr[17] = from->Fpr17;
-        to->fp.powerpc_regs.fpr[18] = from->Fpr18;
-        to->fp.powerpc_regs.fpr[19] = from->Fpr19;
-        to->fp.powerpc_regs.fpr[20] = from->Fpr20;
-        to->fp.powerpc_regs.fpr[21] = from->Fpr21;
-        to->fp.powerpc_regs.fpr[22] = from->Fpr22;
-        to->fp.powerpc_regs.fpr[23] = from->Fpr23;
-        to->fp.powerpc_regs.fpr[24] = from->Fpr24;
-        to->fp.powerpc_regs.fpr[25] = from->Fpr25;
-        to->fp.powerpc_regs.fpr[26] = from->Fpr26;
-        to->fp.powerpc_regs.fpr[27] = from->Fpr27;
-        to->fp.powerpc_regs.fpr[28] = from->Fpr28;
-        to->fp.powerpc_regs.fpr[29] = from->Fpr29;
-        to->fp.powerpc_regs.fpr[30] = from->Fpr30;
-        to->fp.powerpc_regs.fpr[31] = from->Fpr31;
-        to->fp.powerpc_regs.fpscr   = from->Fpscr;
+        to->fp.powerpc64_regs.fpr[0]  = from->Fpr0;
+        to->fp.powerpc64_regs.fpr[1]  = from->Fpr1;
+        to->fp.powerpc64_regs.fpr[2]  = from->Fpr2;
+        to->fp.powerpc64_regs.fpr[3]  = from->Fpr3;
+        to->fp.powerpc64_regs.fpr[4]  = from->Fpr4;
+        to->fp.powerpc64_regs.fpr[5]  = from->Fpr5;
+        to->fp.powerpc64_regs.fpr[6]  = from->Fpr6;
+        to->fp.powerpc64_regs.fpr[7]  = from->Fpr7;
+        to->fp.powerpc64_regs.fpr[8]  = from->Fpr8;
+        to->fp.powerpc64_regs.fpr[9]  = from->Fpr9;
+        to->fp.powerpc64_regs.fpr[10] = from->Fpr10;
+        to->fp.powerpc64_regs.fpr[11] = from->Fpr11;
+        to->fp.powerpc64_regs.fpr[12] = from->Fpr12;
+        to->fp.powerpc64_regs.fpr[13] = from->Fpr13;
+        to->fp.powerpc64_regs.fpr[14] = from->Fpr14;
+        to->fp.powerpc64_regs.fpr[15] = from->Fpr15;
+        to->fp.powerpc64_regs.fpr[16] = from->Fpr16;
+        to->fp.powerpc64_regs.fpr[17] = from->Fpr17;
+        to->fp.powerpc64_regs.fpr[18] = from->Fpr18;
+        to->fp.powerpc64_regs.fpr[19] = from->Fpr19;
+        to->fp.powerpc64_regs.fpr[20] = from->Fpr20;
+        to->fp.powerpc64_regs.fpr[21] = from->Fpr21;
+        to->fp.powerpc64_regs.fpr[22] = from->Fpr22;
+        to->fp.powerpc64_regs.fpr[23] = from->Fpr23;
+        to->fp.powerpc64_regs.fpr[24] = from->Fpr24;
+        to->fp.powerpc64_regs.fpr[25] = from->Fpr25;
+        to->fp.powerpc64_regs.fpr[26] = from->Fpr26;
+        to->fp.powerpc64_regs.fpr[27] = from->Fpr27;
+        to->fp.powerpc64_regs.fpr[28] = from->Fpr28;
+        to->fp.powerpc64_regs.fpr[29] = from->Fpr29;
+        to->fp.powerpc64_regs.fpr[30] = from->Fpr30;
+        to->fp.powerpc64_regs.fpr[31] = from->Fpr31;
+        to->fp.powerpc64_regs.fpscr   = from->Fpscr;
     }
     return STATUS_SUCCESS;
 }
@@ -493,94 +444,94 @@ NTSTATUS context_to_server( context_t *to, const CONTEXT *from )
  */
 NTSTATUS context_from_server( CONTEXT *to, const context_t *from )
 {
-    if (from->cpu != CPU_POWERPC) return STATUS_INVALID_PARAMETER;
+    if (from->cpu != CPU_POWERPC64) return STATUS_INVALID_PARAMETER;
 
     to->ContextFlags = 0;  /* no CPU id? */
     if (from->flags & SERVER_CTX_CONTROL)
     {
         to->ContextFlags |= CONTEXT_CONTROL;
-        to->Msr   = from->ctl.powerpc_regs.msr;
-        to->Ctr   = from->ctl.powerpc_regs.ctr;
-        to->Iar   = from->ctl.powerpc_regs.iar;
-        to->Lr    = from->ctl.powerpc_regs.lr;
-        to->Dar   = from->ctl.powerpc_regs.dar;
-        to->Dsisr = from->ctl.powerpc_regs.dsisr;
-        to->Trap  = from->ctl.powerpc_regs.trap;
+        to->Msr   = from->ctl.powerpc64_regs.msr;
+        to->Ctr   = from->ctl.powerpc64_regs.ctr;
+        to->Iar   = from->ctl.powerpc64_regs.iar;
+        to->Lr    = from->ctl.powerpc64_regs.lr;
+        to->Dar   = from->ctl.powerpc64_regs.dar;
+        to->Dsisr = from->ctl.powerpc64_regs.dsisr;
+        to->Trap  = from->ctl.powerpc64_regs.trap;
     }
     if (from->flags & SERVER_CTX_INTEGER)
     {
         to->ContextFlags |= CONTEXT_INTEGER;
-        to->Gpr0  = from->integer.powerpc_regs.gpr[0];
-        to->Gpr1  = from->integer.powerpc_regs.gpr[1];
-        to->Gpr2  = from->integer.powerpc_regs.gpr[2];
-        to->Gpr3  = from->integer.powerpc_regs.gpr[3];
-        to->Gpr4  = from->integer.powerpc_regs.gpr[4];
-        to->Gpr5  = from->integer.powerpc_regs.gpr[5];
-        to->Gpr6  = from->integer.powerpc_regs.gpr[6];
-        to->Gpr7  = from->integer.powerpc_regs.gpr[7];
-        to->Gpr8  = from->integer.powerpc_regs.gpr[8];
-        to->Gpr9  = from->integer.powerpc_regs.gpr[9];
-        to->Gpr10 = from->integer.powerpc_regs.gpr[10];
-        to->Gpr11 = from->integer.powerpc_regs.gpr[11];
-        to->Gpr12 = from->integer.powerpc_regs.gpr[12];
-        to->Gpr13 = from->integer.powerpc_regs.gpr[13];
-        to->Gpr14 = from->integer.powerpc_regs.gpr[14];
-        to->Gpr15 = from->integer.powerpc_regs.gpr[15];
-        to->Gpr16 = from->integer.powerpc_regs.gpr[16];
-        to->Gpr17 = from->integer.powerpc_regs.gpr[17];
-        to->Gpr18 = from->integer.powerpc_regs.gpr[18];
-        to->Gpr19 = from->integer.powerpc_regs.gpr[19];
-        to->Gpr20 = from->integer.powerpc_regs.gpr[20];
-        to->Gpr21 = from->integer.powerpc_regs.gpr[21];
-        to->Gpr22 = from->integer.powerpc_regs.gpr[22];
-        to->Gpr23 = from->integer.powerpc_regs.gpr[23];
-        to->Gpr24 = from->integer.powerpc_regs.gpr[24];
-        to->Gpr25 = from->integer.powerpc_regs.gpr[25];
-        to->Gpr26 = from->integer.powerpc_regs.gpr[26];
-        to->Gpr27 = from->integer.powerpc_regs.gpr[27];
-        to->Gpr28 = from->integer.powerpc_regs.gpr[28];
-        to->Gpr29 = from->integer.powerpc_regs.gpr[29];
-        to->Gpr30 = from->integer.powerpc_regs.gpr[30];
-        to->Gpr31 = from->integer.powerpc_regs.gpr[31];
-        to->Xer   = from->integer.powerpc_regs.xer;
-        to->Cr    = from->integer.powerpc_regs.cr;
+        to->Gpr0  = from->integer.powerpc64_regs.gpr[0];
+        to->Gpr1  = from->integer.powerpc64_regs.gpr[1];
+        to->Gpr2  = from->integer.powerpc64_regs.gpr[2];
+        to->Gpr3  = from->integer.powerpc64_regs.gpr[3];
+        to->Gpr4  = from->integer.powerpc64_regs.gpr[4];
+        to->Gpr5  = from->integer.powerpc64_regs.gpr[5];
+        to->Gpr6  = from->integer.powerpc64_regs.gpr[6];
+        to->Gpr7  = from->integer.powerpc64_regs.gpr[7];
+        to->Gpr8  = from->integer.powerpc64_regs.gpr[8];
+        to->Gpr9  = from->integer.powerpc64_regs.gpr[9];
+        to->Gpr10 = from->integer.powerpc64_regs.gpr[10];
+        to->Gpr11 = from->integer.powerpc64_regs.gpr[11];
+        to->Gpr12 = from->integer.powerpc64_regs.gpr[12];
+        to->Gpr13 = from->integer.powerpc64_regs.gpr[13];
+        to->Gpr14 = from->integer.powerpc64_regs.gpr[14];
+        to->Gpr15 = from->integer.powerpc64_regs.gpr[15];
+        to->Gpr16 = from->integer.powerpc64_regs.gpr[16];
+        to->Gpr17 = from->integer.powerpc64_regs.gpr[17];
+        to->Gpr18 = from->integer.powerpc64_regs.gpr[18];
+        to->Gpr19 = from->integer.powerpc64_regs.gpr[19];
+        to->Gpr20 = from->integer.powerpc64_regs.gpr[20];
+        to->Gpr21 = from->integer.powerpc64_regs.gpr[21];
+        to->Gpr22 = from->integer.powerpc64_regs.gpr[22];
+        to->Gpr23 = from->integer.powerpc64_regs.gpr[23];
+        to->Gpr24 = from->integer.powerpc64_regs.gpr[24];
+        to->Gpr25 = from->integer.powerpc64_regs.gpr[25];
+        to->Gpr26 = from->integer.powerpc64_regs.gpr[26];
+        to->Gpr27 = from->integer.powerpc64_regs.gpr[27];
+        to->Gpr28 = from->integer.powerpc64_regs.gpr[28];
+        to->Gpr29 = from->integer.powerpc64_regs.gpr[29];
+        to->Gpr30 = from->integer.powerpc64_regs.gpr[30];
+        to->Gpr31 = from->integer.powerpc64_regs.gpr[31];
+        to->Xer   = from->integer.powerpc64_regs.xer;
+        to->Cr    = from->integer.powerpc64_regs.cr;
     }
     if (from->flags & SERVER_CTX_FLOATING_POINT)
     {
         to->ContextFlags |= CONTEXT_FLOATING_POINT;
-        to->Fpr0  = from->fp.powerpc_regs.fpr[0];
-        to->Fpr1  = from->fp.powerpc_regs.fpr[1];
-        to->Fpr2  = from->fp.powerpc_regs.fpr[2];
-        to->Fpr3  = from->fp.powerpc_regs.fpr[3];
-        to->Fpr4  = from->fp.powerpc_regs.fpr[4];
-        to->Fpr5  = from->fp.powerpc_regs.fpr[5];
-        to->Fpr6  = from->fp.powerpc_regs.fpr[6];
-        to->Fpr7  = from->fp.powerpc_regs.fpr[7];
-        to->Fpr8  = from->fp.powerpc_regs.fpr[8];
-        to->Fpr9  = from->fp.powerpc_regs.fpr[9];
-        to->Fpr10 = from->fp.powerpc_regs.fpr[10];
-        to->Fpr11 = from->fp.powerpc_regs.fpr[11];
-        to->Fpr12 = from->fp.powerpc_regs.fpr[12];
-        to->Fpr13 = from->fp.powerpc_regs.fpr[13];
-        to->Fpr14 = from->fp.powerpc_regs.fpr[14];
-        to->Fpr15 = from->fp.powerpc_regs.fpr[15];
-        to->Fpr16 = from->fp.powerpc_regs.fpr[16];
-        to->Fpr17 = from->fp.powerpc_regs.fpr[17];
-        to->Fpr18 = from->fp.powerpc_regs.fpr[18];
-        to->Fpr19 = from->fp.powerpc_regs.fpr[19];
-        to->Fpr20 = from->fp.powerpc_regs.fpr[20];
-        to->Fpr21 = from->fp.powerpc_regs.fpr[21];
-        to->Fpr22 = from->fp.powerpc_regs.fpr[22];
-        to->Fpr23 = from->fp.powerpc_regs.fpr[23];
-        to->Fpr24 = from->fp.powerpc_regs.fpr[24];
-        to->Fpr25 = from->fp.powerpc_regs.fpr[25];
-        to->Fpr26 = from->fp.powerpc_regs.fpr[26];
-        to->Fpr27 = from->fp.powerpc_regs.fpr[27];
-        to->Fpr28 = from->fp.powerpc_regs.fpr[28];
-        to->Fpr29 = from->fp.powerpc_regs.fpr[29];
-        to->Fpr30 = from->fp.powerpc_regs.fpr[30];
-        to->Fpr31 = from->fp.powerpc_regs.fpr[31];
-        to->Fpscr = from->fp.powerpc_regs.fpscr;
+        to->Fpr0  = from->fp.powerpc64_regs.fpr[0];
+        to->Fpr1  = from->fp.powerpc64_regs.fpr[1];
+        to->Fpr2  = from->fp.powerpc64_regs.fpr[2];
+        to->Fpr3  = from->fp.powerpc64_regs.fpr[3];
+        to->Fpr4  = from->fp.powerpc64_regs.fpr[4];
+        to->Fpr5  = from->fp.powerpc64_regs.fpr[5];
+        to->Fpr6  = from->fp.powerpc64_regs.fpr[6];
+        to->Fpr7  = from->fp.powerpc64_regs.fpr[7];
+        to->Fpr8  = from->fp.powerpc64_regs.fpr[8];
+        to->Fpr9  = from->fp.powerpc64_regs.fpr[9];
+        to->Fpr10 = from->fp.powerpc64_regs.fpr[10];
+        to->Fpr11 = from->fp.powerpc64_regs.fpr[11];
+        to->Fpr12 = from->fp.powerpc64_regs.fpr[12];
+        to->Fpr13 = from->fp.powerpc64_regs.fpr[13];
+        to->Fpr14 = from->fp.powerpc64_regs.fpr[14];
+        to->Fpr15 = from->fp.powerpc64_regs.fpr[15];
+        to->Fpr16 = from->fp.powerpc64_regs.fpr[16];
+        to->Fpr17 = from->fp.powerpc64_regs.fpr[17];
+        to->Fpr18 = from->fp.powerpc64_regs.fpr[18];
+        to->Fpr19 = from->fp.powerpc64_regs.fpr[19];
+        to->Fpr20 = from->fp.powerpc64_regs.fpr[20];
+        to->Fpr21 = from->fp.powerpc64_regs.fpr[21];
+        to->Fpr22 = from->fp.powerpc64_regs.fpr[22];
+        to->Fpr23 = from->fp.powerpc64_regs.fpr[23];
+        to->Fpr24 = from->fp.powerpc64_regs.fpr[24];
+        to->Fpr25 = from->fp.powerpc64_regs.fpr[25];
+        to->Fpr26 = from->fp.powerpc64_regs.fpr[26];
+        to->Fpr27 = from->fp.powerpc64_regs.fpr[27];
+        to->Fpr28 = from->fp.powerpc64_regs.fpr[28];
+        to->Fpr29 = from->fp.powerpc64_regs.fpr[29];
+        to->Fpr30 = from->fp.powerpc64_regs.fpr[30];
+        to->Fpr31 = from->fp.powerpc64_regs.fpr[31];
+        to->Fpscr = from->fp.powerpc64_regs.fpscr;
     }
     return STATUS_SUCCESS;
 }
@@ -643,7 +594,7 @@ static NTSTATUS call_stack_handlers( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
     EXCEPTION_POINTERS ptrs;
 
-    FIXME( "not implemented on PowerPC\n" );
+    FIXME( "not implemented on PowerPC 64\n" );
 
     /* hack: call unhandled exception filter directly */
     ptrs.ExceptionRecord = rec;
@@ -666,11 +617,11 @@ static NTSTATUS raise_exception( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL f
     {
         DWORD c;
 
-        TRACE( "code=%x flags=%x addr=%p ip=%x tid=%04x\n",
+        TRACE( "code=%x flags=%x addr=%p ip=%llx tid=%04x\n",
                rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress,
                context->Iar, GetCurrentThreadId() );
         for (c = 0; c < rec->NumberParameters; c++)
-            TRACE( " info[%d]=%08lx\n", c, rec->ExceptionInformation[c] );
+            TRACE( " info[%d]=%08llx\n", c, rec->ExceptionInformation[c] );
         if (rec->ExceptionCode == EXCEPTION_WINE_STUB)
         {
             if (rec->ExceptionInformation[1] >> 16)
@@ -678,7 +629,7 @@ static NTSTATUS raise_exception( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL f
                          rec->ExceptionAddress,
                          (char*)rec->ExceptionInformation[0], (char*)rec->ExceptionInformation[1] );
             else
-                MESSAGE( "wine: Call from %p to unimplemented function %s.%ld, aborting\n",
+                MESSAGE( "wine: Call from %p to unimplemented function %s.%lld, aborting\n",
                          rec->ExceptionAddress,
                          (char*)rec->ExceptionInformation[0], rec->ExceptionInformation[1] );
         }
@@ -737,7 +688,7 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     switch (signal)
     {
     case SIGSEGV:
-    	switch (siginfo->si_code & 0xffff)
+	switch (siginfo->si_code & 0xffff)
         {
 	case SEGV_MAPERR:
 	case SEGV_ACCERR:
@@ -751,9 +702,9 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             FIXME("Unhandled SIGSEGV/%x\n",siginfo->si_code);
             break;
 	}
-    	break;
+	break;
     case SIGBUS:
-    	switch (siginfo->si_code & 0xffff)
+	switch (siginfo->si_code & 0xffff)
         {
 	case BUS_ADRALN:
             rec.ExceptionCode = EXCEPTION_DATATYPE_MISALIGNMENT;
@@ -775,9 +726,9 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             FIXME("Unhandled SIGBUS/%x\n",siginfo->si_code);
             break;
 	}
-    	break;
+	break;
     case SIGILL:
-    	switch (siginfo->si_code & 0xffff)
+	switch (siginfo->si_code & 0xffff)
         {
 	case ILL_ILLOPC: /* illegal opcode */
 #ifdef ILL_ILLOPN
@@ -809,7 +760,7 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
             FIXME("Unhandled SIGILL/%x\n", siginfo->si_code);
             break;
 	}
-    	break;
+	break;
     }
     status = raise_exception( &rec, &context, TRUE );
     if (status) raise_status( status, &rec );
@@ -841,12 +792,12 @@ static void trap_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 #ifdef TRAP_BRKPT
     case TRAP_BRKPT:
         rec.ExceptionCode = EXCEPTION_BREAKPOINT;
-    	break;
+	break;
 #endif
 #ifdef TRAP_TRACE
     case TRAP_TRACE:
         rec.ExceptionCode = EXCEPTION_SINGLE_STEP;
-    	break;
+	break;
 #endif
     default:
         FIXME("Unhandled SIGTRAP/%x\n", siginfo->si_code);
@@ -1091,8 +1042,8 @@ void signal_init_process(void)
     if (sigaction( SIGUSR1, &sig_act, NULL ) == -1) goto error;
 
     sig_act.sa_sigaction = segv_handler;
-    if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
-    if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
+   if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
+   if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
 #ifdef SIGBUS
     if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
 #endif
@@ -1114,7 +1065,7 @@ void signal_init_process(void)
  */
 void WINAPI RtlUnwind( PVOID pEndFrame, PVOID targetIp, PEXCEPTION_RECORD pRecord, PVOID retval )
 {
-    FIXME( "Not implemented on PowerPC\n" );
+    FIXME( "Not implemented on PowerPC 64\n" );
 }
 
 /*******************************************************************
@@ -1188,10 +1139,10 @@ static void thread_startup( void *param )
 
     /* build the initial context */
     context.ContextFlags = CONTEXT_FULL;
-    context.Gpr1 = (DWORD)NtCurrentTeb()->Tib.StackBase;
-    context.Gpr3 = (DWORD)info->entry;
-    context.Gpr4 = (DWORD)info->arg;
-    context.Iar  = (DWORD)info->start;
+    context.Gpr1 = (DWORD64)NtCurrentTeb()->Tib.StackBase;
+    context.Gpr3 = (DWORD64)info->entry;
+    context.Gpr4 = (DWORD64)info->arg;
+    context.Iar  = (DWORD64)info->start;
 
     if (info->suspend) wait_suspend( &context );
     LdrInitializeThunk( &context, (void **)&context.Gpr3, 0, 0 );
@@ -1267,4 +1218,4 @@ TEB * WINAPI NtCurrentTeb(void)
     return pthread_getspecific( teb_key );
 }
 
-#endif  /* defined(__powerpc__) && !defined(__powerpc64__) */
+#endif  /* __powerpc64__ */

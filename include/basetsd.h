@@ -277,6 +277,16 @@ typedef ULONG_PTR KAFFINITY, *PKAFFINITY;
 # undef  WORDS_BIGENDIAN
 # undef  BITFIELDS_BIGENDIAN
 # define ALLOW_UNALIGNED_ACCESS
+#elif defined(__powerpc64__)
+# if defined(__BIG_ENDIAN__)
+#  define WORDS_BIGENDIAN
+#  define BITFIELDS_BIGENDIAN
+#  undef  ALLOW_UNALIGNED_ACCESS
+# else
+#  undef  WORDS_BIGENDIAN
+#  undef  BITFIELDS_BIGENDIAN
+#  undef  ALLOW_UNALIGNED_ACCESS
+#endif
 #elif defined(__powerpc__)
 # define WORDS_BIGENDIAN
 # define BITFIELDS_BIGENDIAN

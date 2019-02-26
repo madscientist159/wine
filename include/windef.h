@@ -80,6 +80,9 @@ extern "C" {
 #   define __stdcall __attribute__((pcs("aapcs-vfp")))
 # elif defined(__aarch64__) && defined (__GNUC__)
 #  define __stdcall __attribute__((ms_abi))
+# elif defined(__powerpc64__) && defined (__GNUC__)
+   /* ppc64 relies on long calls being generated for thunks (r2 save / restore) */
+#  define __stdcall __attribute__((__longcall__))
 # else  /* __i386__ */
 #  define __stdcall
 # endif  /* __i386__ */
@@ -102,6 +105,9 @@ extern "C" {
 #   define __cdecl __attribute__((pcs("aapcs-vfp")))
 # elif defined(__aarch64__) && defined (__GNUC__)
 #  define __cdecl __attribute__((ms_abi))
+# elif defined(__powerpc64__) && defined (__GNUC__)
+   /* ppc64 relies on long calls being generated for thunks (r2 save / restore) */
+#  define __cdecl __attribute__((__longcall__))
 # elif !defined(_MSC_VER)
 #  define __cdecl
 # endif

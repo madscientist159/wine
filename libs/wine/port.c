@@ -2,6 +2,7 @@
  * Wine portability routines
  *
  * Copyright 2000 Alexandre Julliard
+ * Copyright 2019 Timothy Pearson <tpearson@raptorengineering.com> (PowerPC 64)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -147,6 +148,24 @@ __ASM_GLOBAL_FUNC( wine_call_on_stack,
                    __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
                    __ASM_CFI(".cfi_same_value %rbp\n\t")
                    "ret")
+#elif defined(__powerpc64__) && defined(__GNUC__)
+__ASM_GLOBAL_FUNC( wine_call_on_stack,
+                   "mflr 0\n\t"           /* get return address */
+                   "std 0, 16(1)\n\t"     /* save return address on stack */
+                   "subi 5, 5, 112\n\t"   /* reserve space on new stack */
+                   "std 1, 48(5)\n\t"     /* store old sp */
+                   "mr 12, 3\n\t"         /* func -> r12: ppc64 v2 requires r12 == ctr before bctr for TOC setup */
+                   "mtctr 12\n\t"         /* func -> ctr */
+                   "mr 3, 4\n\t"          /* args -> function param 1 (r3) */
+                   "mr 1, 5\n\t"          /* stack */
+                   "li 0, 0\n\t"          /* zero */
+                   "std 0, 0(1)\n\t"      /* bottom of stack */
+                   "stdu 1, -112(1)\n\t"  /* create a frame for this function */
+                   "bctrl\n\t"            /* call ctr */
+                   "ld 1, 160(1)\n\t"     /* fetch old sp */
+                   "ld 0, 16(1)\n\t"      /* fetch return address */
+                   "mtlr 0\n\t"           /* return address -> lr */
+                   "blr")                 /* return */
 #elif defined(__powerpc__) && defined(__GNUC__)
 __ASM_GLOBAL_FUNC( wine_call_on_stack,
                    "mflr 0\n\t"         /* get return address */

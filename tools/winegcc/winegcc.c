@@ -160,6 +160,7 @@ static const struct
     { "amd64",   CPU_x86_64 },
     { "x86_64",  CPU_x86_64 },
     { "powerpc", CPU_POWERPC },
+    { "powerpc64", CPU_POWERPC64 },
     { "arm",     CPU_ARM },
     { "armv5",   CPU_ARM },
     { "armv6",   CPU_ARM },
@@ -225,6 +226,8 @@ struct options
 static const enum target_cpu build_cpu = CPU_x86;
 #elif defined(__x86_64__)
 static const enum target_cpu build_cpu = CPU_x86_64;
+#elif defined(__powerpc64__)
+static const enum target_cpu build_cpu = CPU_POWERPC64;
 #elif defined(__powerpc__)
 static const enum target_cpu build_cpu = CPU_POWERPC;
 #elif defined(__arm__)
@@ -436,9 +439,9 @@ static int check_platform( struct options *opts, const char *file )
             if (!memcmp( header, "\177ELF", 4 ))
             {
                 if (header[4] == 2)  /* 64-bit */
-                    ret = (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64);
+                    ret = (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 || opts->target_cpu == CPU_POWERPC64);
                 else
-                    ret = (opts->target_cpu != CPU_x86_64 && opts->target_cpu != CPU_ARM64);
+                    ret = (opts->target_cpu != CPU_x86_64 && opts->target_cpu != CPU_ARM64 && opts->target_cpu != CPU_POWERPC64);
             }
         }
         close( fd );
@@ -450,11 +453,12 @@ static const char *get_multiarch_dir( enum target_cpu cpu )
 {
    switch(cpu)
    {
-   case CPU_x86:     return "/i386-linux-gnu";
-   case CPU_x86_64:  return "/x86_64-linux-gnu";
-   case CPU_ARM:     return "/arm-linux-gnueabi";
-   case CPU_ARM64:   return "/aarch64-linux-gnu";
-   case CPU_POWERPC: return "/powerpc-linux-gnu";
+   case CPU_x86:       return "/i386-linux-gnu";
+   case CPU_x86_64:    return "/x86_64-linux-gnu";
+   case CPU_ARM:       return "/arm-linux-gnueabi";
+   case CPU_ARM64:     return "/aarch64-linux-gnu";
+   case CPU_POWERPC:   return "/powerpc-linux-gnu";
+   case CPU_POWERPC64: return "/powerpc64le-linux-gnu";
    default:
        assert(0);
        return NULL;
@@ -469,8 +473,8 @@ static char *get_lib_dir( struct options *opts )
     unsigned int i;
     size_t build_len, target_len;
 
-    bit_suffix = opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 ? "64" : "32";
-    other_bit_suffix = opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 ? "32" : "64";
+    bit_suffix = opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 || opts->target_cpu == CPU_POWERPC64 ? "64" : "32";
+    other_bit_suffix = opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 || opts->target_cpu == CPU_POWERPC64 ? "32" : "64";
     build_multiarch = get_multiarch_dir( build_cpu );
     target_multiarch = get_multiarch_dir( opts->target_cpu );
     build_len = strlen( build_multiarch );
@@ -595,7 +599,7 @@ static void compile(struct options* opts, const char* lang)
         strarray_add(comp_args, "-fPIC");
     }
 
-    if (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64)
+    if (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 || opts->target_cpu == CPU_POWERPC64)
     {
         strarray_add(comp_args, "-DWIN64");
         strarray_add(comp_args, "-D_WIN64");
@@ -633,6 +637,7 @@ static void compile(struct options* opts, const char* lang)
         case CPU_ARM:
         case CPU_ARM64:
         case CPU_POWERPC:
+        case CPU_POWERPC64:
             strarray_add(comp_args, "-D__stdcall=");
             strarray_add(comp_args, "-D__cdecl=");
             strarray_add(comp_args, "-D_stdcall=");
@@ -659,7 +664,7 @@ static void compile(struct options* opts, const char* lang)
     strarray_add(comp_args, "-D__int8=char");
     strarray_add(comp_args, "-D__int16=short");
     strarray_add(comp_args, "-D__int32=int");
-    if (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64)
+    if (opts->target_cpu == CPU_x86_64 || opts->target_cpu == CPU_ARM64 || opts->target_cpu == CPU_POWERPC64)
         strarray_add(comp_args, "-D__int64=long");
     else
         strarray_add(comp_args, "-D__int64=long long");
@@ -1216,8 +1221,14 @@ static void build(struct options* opts)
             else
                 prelink = PRELINK;
         }
-        if (!try_link(opts->prefix, link_args, "-Wl,-z,max-page-size=0x1000"))
-            strarray_add(link_args, "-Wl,-z,max-page-size=0x1000");
+        if (opts->target_cpu == CPU_POWERPC64) {
+            if (!try_link(opts->prefix, link_args, "-Wl,-z,max-page-size=0x10000"))
+                strarray_add(link_args, "-Wl,-z,max-page-size=0x10000");
+        }
+        else {
+            if (!try_link(opts->prefix, link_args, "-Wl,-z,max-page-size=0x1000"))
+                strarray_add(link_args, "-Wl,-z,max-page-size=0x1000");
+        }
         break;
     }
 
@@ -1588,6 +1599,8 @@ int main(int argc, char **argv)
                             opts.target_cpu = CPU_x86;
                         else if (opts.target_cpu == CPU_ARM64)
                             opts.target_cpu = CPU_ARM;
+                        else if (opts.target_cpu == CPU_POWERPC64)
+                            opts.target_cpu = CPU_POWERPC;
                         opts.force_pointer_size = 4;
 			raw_linker_arg = 1;
                     }
@@ -1597,6 +1610,8 @@ int main(int argc, char **argv)
                             opts.target_cpu = CPU_x86_64;
                         else if (opts.target_cpu == CPU_ARM)
                             opts.target_cpu = CPU_ARM64;
+                        else if (opts.target_cpu == CPU_POWERPC)
+                            opts.target_cpu = CPU_POWERPC64;
                         opts.force_pointer_size = 8;
 			raw_linker_arg = 1;
                     }

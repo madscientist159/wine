@@ -280,6 +280,8 @@ static BOOL build_fake_dll( HANDLE file, const WCHAR *name )
     nt->FileHeader.Machine = IMAGE_FILE_MACHINE_ARM64;
 #elif defined __arm__
     nt->FileHeader.Machine = IMAGE_FILE_MACHINE_ARMNT;
+#elif defined __powerpc64__
+    nt->FileHeader.Machine = IMAGE_FILE_MACHINE_POWERPC64;
 #elif defined __powerpc__
     nt->FileHeader.Machine = IMAGE_FILE_MACHINE_POWERPC;
 #else

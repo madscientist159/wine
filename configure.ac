@@ -217,6 +217,14 @@ case $host in
   i[[3456789]]86*)
     enable_win16=${enable_win16:-yes}
     ;;
+  powerpc64*)
+    CC="$CC -m64"
+    CXX="$CXX -m64"
+    host_cpu="powerpc64"
+    notice_platform="64-bit "
+    AC_SUBST(TARGETFLAGS,"-m64")
+    enable_win64=${enable_win64:-yes}
+    ;;
 esac
 
 dnl enable_win16 defaults to yes on x86, to no on other CPUs
@@ -932,6 +940,7 @@ case $host_os in
         *x86_64*)      exec_prefix='${prefix}/x86_64' ;;
         *arm*)         exec_prefix='${prefix}/armeabi-v7a' ;;
         *aarch64*)     exec_prefix='${prefix}/arm64-v8a' ;;
+        *powerpc64*)   exec_prefix='${prefix}/ppc64' ;;
       esac
     fi
     ;;

@@ -1324,7 +1324,7 @@
 @ stub _o__scalbf
 @ stub _o__searchenv
 @ stub _o__searchenv_s
-@ cdecl _o__seh_filter_dll(long ptr) __CppXcptFilter
+@ cdecl -arch=i386,x86_64,arm,arm64 _o__seh_filter_dll(long ptr) __CppXcptFilter
 @ cdecl _o__seh_filter_exe(long ptr) _XcptFilter
 @ stub _o__set_abort_behavior
 @ cdecl _o__set_app_type(long) MSVCRT___set_app_type

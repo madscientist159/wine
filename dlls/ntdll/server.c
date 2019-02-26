@@ -100,6 +100,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(server);
 static const enum cpu_type client_cpu = CPU_x86;
 #elif defined(__x86_64__)
 static const enum cpu_type client_cpu = CPU_x86_64;
+#elif defined(__powerpc64__)
+static const enum cpu_type client_cpu = CPU_POWERPC64;
 #elif defined(__powerpc__)
 static const enum cpu_type client_cpu = CPU_POWERPC;
 #elif defined(__arm__)
@@ -1475,7 +1477,7 @@ void server_init_process_done(void)
  */
 size_t server_init_thread( void *entry_point, BOOL *suspend )
 {
-    static const char *cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64" };
+    static const char *cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64", "PowerPC64" };
     static const BOOL is_win64 = (sizeof(void *) > sizeof(int));
     const char *arch = getenv( "WINEARCH" );
     int ret;
@@ -1518,7 +1520,7 @@ size_t server_init_thread( void *entry_point, BOOL *suspend )
     }
     SERVER_END_REQ;
 
-    is_wow64 = !is_win64 && (server_cpus & ((1 << CPU_x86_64) | (1 << CPU_ARM64))) != 0;
+    is_wow64 = !is_win64 && (server_cpus & ((1 << CPU_x86_64) | (1 << CPU_ARM64) | (1 << CPU_POWERPC64))) != 0;
     ntdll_get_thread_data()->wow64_redir = is_wow64;
 
     switch (ret)

@@ -21,7 +21,7 @@
 
 #include "debugger.h"
 
-#if defined(__powerpc__) && !defined(__powerpc64__)
+#if defined(__powerpc64__)
 
 static BOOL be_ppc_get_addr(HANDLE hThread, const dbg_ctx_t *ctx,
                             enum be_cpu_addr bca, ADDRESS64* addr)
@@ -48,7 +48,7 @@ static void be_ppc_single_step(dbg_ctx_t *ctx, BOOL enable)
 {
 #ifndef MSR_SE
 # define MSR_SE (1<<10)
-#endif 
+#endif
     if (enable) ctx->ctx.Msr |= MSR_SE;
     else ctx->ctx.Msr &= ~MSR_SE;
 }
@@ -191,7 +191,7 @@ static BOOL be_ppc_set_context(HANDLE thread, const dbg_ctx_t *ctx)
     return SetThreadContext(thread, &ctx->ctx);
 }
 
-#define REG(r,gs,m)  {FIELD_OFFSET(CONTEXT, r), sizeof(((CONTEXT*)NULL)->r), gs, m}
+#define REG(r,gs)  {FIELD_OFFSET(CONTEXT, r), sizeof(((CONTEXT*)NULL)->r), gs}
 
 static struct gdb_register be_ppc_gdb_register_map[] = {
     REG(Gpr0,  4),
@@ -269,10 +269,10 @@ static struct gdb_register be_ppc_gdb_register_map[] = {
     /* see gdb/nlm/ppc.c */
 };
 
-struct backend_cpu be_ppc =
+struct backend_cpu be_ppc64 =
 {
-    IMAGE_FILE_MACHINE_POWERPC,
-    4,
+    IMAGE_FILE_MACHINE_POWERPC64,
+    8,
     be_cpu_linearize,
     be_cpu_build_addr,
     be_ppc_get_addr,

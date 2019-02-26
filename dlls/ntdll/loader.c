@@ -211,7 +211,7 @@ static inline BOOL call_dll_entry_point( DLLENTRYPROC proc, void *module,
 #endif /* __i386__ */
 
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__arm__) || defined(__aarch64__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__arm__) || defined(__aarch64__) || defined(__powerpc64__)
 /*************************************************************************
  *		stub_entry_point
  *
@@ -1964,11 +1964,15 @@ static BOOL is_valid_binary( HMODULE module, const pe_image_info_t *info )
     return info->machine == IMAGE_FILE_MACHINE_ARM ||
            info->machine == IMAGE_FILE_MACHINE_THUMB ||
            info->machine == IMAGE_FILE_MACHINE_ARMNT;
+#elif defined(__powerpc__) && !defined(__powerpc64__)
+    return info->machine == IMAGE_FILE_MACHINE_POWERPC;
 #elif defined(_WIN64)  /* support 32-bit IL-only images on 64-bit */
-#ifdef __x86_64__
+#if defined(__x86_64__)
     if (info->machine == IMAGE_FILE_MACHINE_AMD64) return TRUE;
-#else
+#elif defined(__aarch64__)
     if (info->machine == IMAGE_FILE_MACHINE_ARM64) return TRUE;
+#elif defined(__powerpc64__)
+    if (info->machine == IMAGE_FILE_MACHINE_POWERPC64) return TRUE;
 #endif
     if (!info->contains_code) return TRUE;
     if (!(info->image_flags & IMAGE_FLAGS_ComPlusNativeReady))

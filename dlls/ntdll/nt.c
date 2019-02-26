@@ -1136,6 +1136,14 @@ static inline void get_cpuinfo(SYSTEM_CPU_INFORMATION* info)
     }
 }
 
+#elif defined(__powerpc64__)
+
+static inline void get_cpuinfo(SYSTEM_CPU_INFORMATION* info)
+{
+    FIXME("CPU Feature detection not implemented.\n");
+    info->Architecture = PROCESSOR_ARCHITECTURE_PPC64;
+}
+
 #elif defined(__powerpc__) || defined(__ppc__)
 
 static inline void get_cpuinfo(SYSTEM_CPU_INFORMATION* info)

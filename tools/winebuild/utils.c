@@ -62,6 +62,7 @@ static const struct
     { "amd64",   CPU_x86_64 },
     { "x86_64",  CPU_x86_64 },
     { "powerpc", CPU_POWERPC },
+    { "powerpc64", CPU_POWERPC64 },
     { "arm",     CPU_ARM },
     { "armv5",   CPU_ARM },
     { "armv6",   CPU_ARM },
@@ -410,6 +411,7 @@ struct strarray get_as_command(void)
         default:
             switch(target_cpu)
             {
+            case CPU_POWERPC64:
             case CPU_POWERPC:
                 strarray_add_one( &args, (force_pointer_size == 8) ? "-a64" : "-a32" );
                 break;
@@ -451,6 +453,13 @@ struct strarray get_ld_command(void)
         default:
             switch(target_cpu)
             {
+            case CPU_POWERPC64:
+#if defined(__BIG_ENDIAN__)
+                strarray_add( &args, "-m", (force_pointer_size == 8) ? "elf64ppc" : "elf32ppc", NULL );
+#else
+                strarray_add( &args, "-m", (force_pointer_size == 8) ? "elf64lppc" : "elf32lppc", NULL );
+#endif
+                break;
             case CPU_POWERPC:
                 strarray_add( &args, "-m", (force_pointer_size == 8) ? "elf64ppc" : "elf32ppc", NULL );
                 break;
@@ -897,6 +906,7 @@ unsigned int get_alignment(unsigned int align)
         if (target_platform != PLATFORM_APPLE) return align;
         /* fall through */
     case CPU_POWERPC:
+    case CPU_POWERPC64:
     case CPU_ARM:
     case CPU_ARM64:
         n = 0;
@@ -918,6 +928,7 @@ unsigned int get_page_size(void)
     case CPU_POWERPC:
     case CPU_ARM:
         return 0x1000;
+    case CPU_POWERPC64:
     case CPU_ARM64:
         return 0x10000;
     }
@@ -937,6 +948,7 @@ unsigned int get_ptr_size(void)
         return 4;
     case CPU_x86_64:
     case CPU_ARM64:
+    case CPU_POWERPC64:
         return 8;
     }
     /* unreached */

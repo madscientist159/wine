@@ -2,6 +2,7 @@
  * Win32 definitions for Windows NT
  *
  * Copyright 1996 Alexandre Julliard
+ * Copyright 2019 Timothy Pearson <tpearson@raptorengineering.com> (PowerPC 64)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -655,6 +656,7 @@ typedef DWORD FLONG;
 #define PROCESSOR_ARCHITECTURE_ARM64            12
 #define PROCESSOR_ARCHITECTURE_ARM32_ON_WIN64   13
 #define PROCESSOR_ARCHITECTURE_IA32_ON_ARM64    14
+#define PROCESSOR_ARCHITECTURE_PPC64		15
 #define PROCESSOR_ARCHITECTURE_UNKNOWN	0xFFFF
 
 /* dwProcessorType */
@@ -672,6 +674,7 @@ typedef DWORD FLONG;
 #define PROCESSOR_PPC_603        603
 #define PROCESSOR_PPC_604        604
 #define PROCESSOR_PPC_620        620
+#define PROCESSOR_PPC64_OP       690
 #define PROCESSOR_HITACHI_SH3    10003
 #define PROCESSOR_HITACHI_SH3E   10004
 #define PROCESSOR_HITACHI_SH4    10005
@@ -1985,8 +1988,138 @@ typedef struct _CONTEXT
 
 #endif  /* _MIPS_ */
 
-/* PowerPC context definitions */
-#ifdef __powerpc__
+/* PowerPC 64-bit context definitions */
+#if defined(__powerpc64__)
+
+#define CONTEXT_CONTROL         0x0001
+#define CONTEXT_FLOATING_POINT  0x0002
+#define CONTEXT_INTEGER         0x0004
+#define CONTEXT_DEBUG_REGISTERS 0x0008
+#define CONTEXT_FULL (CONTEXT_CONTROL | CONTEXT_FLOATING_POINT | CONTEXT_INTEGER)
+#define CONTEXT_ALL (CONTEXT_CONTROL | CONTEXT_INTEGER | \
+        CONTEXT_FLOATING_POINT | CONTEXT_DEBUG_REGISTERS)
+
+#define EXCEPTION_READ_FAULT    0
+#define EXCEPTION_WRITE_FAULT   1
+#define EXCEPTION_EXECUTE_FAULT 8
+
+typedef struct
+{
+    /* These are selected by CONTEXT_FLOATING_POINT */
+    double Fpr0;
+    double Fpr1;
+    double Fpr2;
+    double Fpr3;
+    double Fpr4;
+    double Fpr5;
+    double Fpr6;
+    double Fpr7;
+    double Fpr8;
+    double Fpr9;
+    double Fpr10;
+    double Fpr11;
+    double Fpr12;
+    double Fpr13;
+    double Fpr14;
+    double Fpr15;
+    double Fpr16;
+    double Fpr17;
+    double Fpr18;
+    double Fpr19;
+    double Fpr20;
+    double Fpr21;
+    double Fpr22;
+    double Fpr23;
+    double Fpr24;
+    double Fpr25;
+    double Fpr26;
+    double Fpr27;
+    double Fpr28;
+    double Fpr29;
+    double Fpr30;
+    double Fpr31;
+    double Fpscr;
+
+    /* These are selected by CONTEXT_INTEGER */
+    DWORD64 Gpr0;
+    DWORD64 Gpr1;
+    DWORD64 Gpr2;
+    DWORD64 Gpr3;
+    DWORD64 Gpr4;
+    DWORD64 Gpr5;
+    DWORD64 Gpr6;
+    DWORD64 Gpr7;
+    DWORD64 Gpr8;
+    DWORD64 Gpr9;
+    DWORD64 Gpr10;
+    DWORD64 Gpr11;
+    DWORD64 Gpr12;
+    DWORD64 Gpr13;
+    DWORD64 Gpr14;
+    DWORD64 Gpr15;
+    DWORD64 Gpr16;
+    DWORD64 Gpr17;
+    DWORD64 Gpr18;
+    DWORD64 Gpr19;
+    DWORD64 Gpr20;
+    DWORD64 Gpr21;
+    DWORD64 Gpr22;
+    DWORD64 Gpr23;
+    DWORD64 Gpr24;
+    DWORD64 Gpr25;
+    DWORD64 Gpr26;
+    DWORD64 Gpr27;
+    DWORD64 Gpr28;
+    DWORD64 Gpr29;
+    DWORD64 Gpr30;
+    DWORD64 Gpr31;
+
+    DWORD64 Cr;
+    DWORD64 Xer;
+
+    /* These are selected by CONTEXT_CONTROL */
+    DWORD64 Msr;
+    DWORD64 Iar; /* Instruction Address Register , aka PC ... */
+    DWORD64 Lr;
+    DWORD64 Ctr;
+
+    DWORD64 ContextFlags;
+
+    DWORD64 Dar;   /* Fault registers for coredump */
+    DWORD64 Dsisr;
+    DWORD64 Trap;  /* number of powerpc exception taken */
+
+    /* These are selected by CONTEXT_DEBUG_REGISTERS */
+    DWORD64 Dr0;
+    DWORD64 Dr1;
+    DWORD64 Dr2;
+    DWORD64 Dr3;
+    DWORD64 Dr4;
+    DWORD64 Dr5;
+    DWORD64 Dr6;
+    DWORD64 Dr7;
+} CONTEXT;
+
+typedef struct _STACK_FRAME_HEADER
+{
+    DWORD BackChain;
+    DWORD GlueSaved1;
+    DWORD GlueSaved2;
+    DWORD Reserved1;
+    DWORD Spare1;
+    DWORD Spare2;
+
+    DWORD Parameter0;
+    DWORD Parameter1;
+    DWORD Parameter2;
+    DWORD Parameter3;
+    DWORD Parameter4;
+    DWORD Parameter5;
+    DWORD Parameter6;
+    DWORD Parameter7;
+} STACK_FRAME_HEADER,*PSTACK_FRAME_HEADER;
+
+#elif defined(__powerpc__)
 
 #define CONTEXT_CONTROL         0x0001
 #define CONTEXT_FLOATING_POINT  0x0002
@@ -2729,6 +2862,7 @@ typedef struct _IMAGE_VXD_HEADER {
 #define	IMAGE_FILE_MACHINE_AM33		0x01d3
 #define	IMAGE_FILE_MACHINE_POWERPC	0x01f0
 #define	IMAGE_FILE_MACHINE_POWERPCFP	0x01f1
+#define	IMAGE_FILE_MACHINE_POWERPC64	0x01f2
 #define	IMAGE_FILE_MACHINE_IA64		0x0200
 #define	IMAGE_FILE_MACHINE_MIPS16	0x0266
 #define	IMAGE_FILE_MACHINE_ALPHA64	0x0284

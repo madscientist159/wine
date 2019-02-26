@@ -60,11 +60,11 @@ static ULONG execute_flags = MEM_EXECUTE_OPTION_DISABLE;
 
 static const BOOL is_win64 = (sizeof(void *) > sizeof(int));
 
-static const char * const cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64" };
+static const char * const cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64", "PowerPC 64" };
 
 static inline BOOL is_64bit_arch( cpu_type_t cpu )
 {
-    return (cpu == CPU_x86_64 || cpu == CPU_ARM64);
+    return (cpu == CPU_x86_64 || cpu == CPU_ARM64 || cpu == CPU_POWERPC64);
 }
 
 /*
@@ -520,13 +520,13 @@ NTSTATUS WINAPI NtQueryInformationProcess(
             ULONG_PTR val = 0;
 
             if (ProcessHandle == GetCurrentProcess()) val = is_wow64;
-            else if (server_cpus & ((1 << CPU_x86_64) | (1 << CPU_ARM64)))
+            else if (server_cpus & ((1 << CPU_x86_64) | (1 << CPU_ARM64) | (1 << CPU_POWERPC64)))
             {
                 SERVER_START_REQ( get_process_info )
                 {
                     req->handle = wine_server_obj_handle( ProcessHandle );
                     if (!(ret = wine_server_call( req )))
-                        val = (reply->cpu != CPU_x86_64 && reply->cpu != CPU_ARM64);
+                        val = (reply->cpu != CPU_x86_64 && reply->cpu != CPU_ARM64 && reply->cpu != CPU_POWERPC64);
                 }
                 SERVER_END_REQ;
             }

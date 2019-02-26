@@ -3,6 +3,7 @@
  *
  * Copyright 2000, 2004 Alexandre Julliard
  * Copyright 2000 Eric Pouech
+ * Copyright 2019 Timothy Pearson <tpearson@raptorengineering.com> (PowerPC 64)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -694,6 +695,20 @@ static void output_import_thunk( const char *name, const char *table, int pos )
         output( "\tmr    %s, %s\n", ppc_reg(31), ppc_reg(0) );
         output( "\tbctr\n" );
         break;
+    case CPU_POWERPC64:
+	/*
+         * The ppc64 ABI v2 expects r12 to be set to ctr before bctr for PLT-like calls.
+         * ABIv2-compatible functions attempt to rebuild the TOC pointer (r2) from r12 under this assumption.
+         */
+        output( "\tlis %s, (%s+%d)@highest\n", ppc_reg(12), table, pos );
+        output( "\tori %s, %s, (%s+%d)@higher\n", ppc_reg(12), ppc_reg(12), table, pos );
+        output( "\trldicr %s, %s, 32, 31\n", ppc_reg(12), ppc_reg(12) );
+        output( "\toris %s, %s, (%s+%d)@high\n", ppc_reg(12), ppc_reg(12), table, pos );
+        output( "\tori %s, %s, (%s+%d)@l\n", ppc_reg(12), ppc_reg(12), table, pos );
+        output( "\tld %s, 0(%s)\n", ppc_reg(12), ppc_reg(12) );
+        output( "\tmtctr %s\n", ppc_reg(12) );
+        output( "\tbctr\n" );
+        break;
     }
     output_cfi( ".cfi_endproc" );
     output_function_size( name );
@@ -1045,6 +1060,62 @@ static void output_delayed_import_thunks( const DLLSPEC *spec )
         /* branch to ctr register. */
         output( "\tbctr\n");
         break;
+    case CPU_POWERPC64:
+        /* Save all callee saved registers into a stackframe. */
+        output( "\tstdu %s, -%d(%s)\n",ppc_reg(1), 168+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(3),  48+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(4),  56+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(5),  64+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(6),  72+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(7),  80+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(8),  88+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(9),  96+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(10),104+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(11),112+extra_stack_storage, ppc_reg(1));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(12),120+extra_stack_storage, ppc_reg(1));
+
+        /* r0 -> r3 (arg1) */
+        output( "\tmr %s, %s\n", ppc_reg(3), ppc_reg(0));
+
+        /* save return address */
+        output( "\tmflr %s\n", ppc_reg(0));
+        output( "\tstd  %s, %d(%s)\n", ppc_reg(0), 168+16+extra_stack_storage, ppc_reg(1));
+
+        /* Call the __wine_delay_load function, arg1 is arg1. */
+        output( "\tlis %s, %s@highest\n", ppc_reg(12), asm_name("__wine_spec_delay_load") );
+        output( "\tori %s, %s, %s@higher\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_spec_delay_load") );
+        output( "\trldicr %s, %s, 32, 31\n", ppc_reg(12), ppc_reg(12) );
+        output( "\toris %s, %s, %s@high\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_spec_delay_load") );
+        output( "\tori %s, %s, %s@l\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_spec_delay_load") );
+        output( "\tmtctr %s\n", ppc_reg(12) );
+        output( "\tbctrl\n" );
+
+        /* r3 (return value) -> r12 (branch / ctr) */
+        output( "\tmr %s, %s\n", ppc_reg(12), ppc_reg(3));
+
+        /* Load return value from call into ctr register */
+        output( "\tmtctr %s\n", ppc_reg(12));
+
+        /* restore all saved registers and drop stackframe. */
+        output( "\tld  %s, %d(%s)\n", ppc_reg(3),  48+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(4),  56+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(5),  64+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(6),  72+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(7),  80+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(8),  88+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(9),  96+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(10),104+extra_stack_storage, ppc_reg(1));
+        output( "\tld  %s, %d(%s)\n", ppc_reg(11),112+extra_stack_storage, ppc_reg(1));
+        /* don't restore r12!  restoring r12 here would corrupt the computed TOC post-bctr. */
+
+        /* Load return value from call into return register */
+        output( "\tld  %s,  %d(%s)\n", ppc_reg(0), 168+16+extra_stack_storage, ppc_reg(1));
+        output( "\tmtlr %s\n", ppc_reg(0));
+        output( "\tld %s, 0(%s)\n", ppc_reg(1), ppc_reg(1));
+
+        /* branch to ctr register. */
+        output( "\tbctr\n");
+        break;
     }
     output_cfi( ".cfi_endproc" );
     output_function_size( "__wine_delay_load_asm" );
@@ -1122,6 +1193,26 @@ static void output_delayed_import_thunks( const DLLSPEC *spec )
                     output( "\tb %s\n", asm_name("__wine_delay_load_asm") );
                     break;
                 }
+                break;
+            case CPU_POWERPC64:
+                /* Set up arg1 (r0)
+                 * Clobbers r12 since ppc64 ABI v2 expects r12 == ctr at branch to ctr,
+                 * i.e. we set up r12 right after this.
+                 */
+                output( "\tlis %s, %d@highest\n", ppc_reg(12), (idx << 16) | j );
+                output( "\tori %s, %s, %d@higher\n", ppc_reg(12), ppc_reg(12), (idx << 16) | j );
+                output( "\trldicr %s, %s, 32, 31\n", ppc_reg(12), ppc_reg(12) );
+                output( "\toris %s, %s, %d@high\n", ppc_reg(12), ppc_reg(12), (idx << 16) | j );
+                output( "\tori %s, %s, %d@l\n", ppc_reg(12), ppc_reg(12), (idx << 16) | j );
+                output( "\tmr %s, %s\n", ppc_reg(0), ppc_reg(12) );
+
+                output( "\tlis %s, %s@highest\n", ppc_reg(12), asm_name("__wine_delay_load_asm") );
+                output( "\tori %s, %s, %s@higher\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_delay_load_asm") );
+                output( "\trldicr %s, %s, 32, 31\n", ppc_reg(12), ppc_reg(12) );
+                output( "\toris %s, %s, %s@high\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_delay_load_asm") );
+                output( "\tori %s, %s, %s@l\n", ppc_reg(12), ppc_reg(12), asm_name("__wine_delay_load_asm") );
+                output( "\tmtctr %s\n", ppc_reg(12) );
+                output( "\tbctr\n" );
                 break;
             }
             output_cfi( ".cfi_endproc" );
@@ -1296,6 +1387,32 @@ void output_stubs( DLLSPEC *spec )
             output( "\tadrp x2, %s\n", asm_name("__wine_spec_unimplemented_stub") );
             output( "\tadd x2, x2, #:lo12:%s\n", asm_name("__wine_spec_unimplemented_stub") );
             output( "\tblr x2\n" );
+            break;
+        case CPU_POWERPC64:
+            /* Clobbers r3, r4, and r12 */
+            output( "\tlis %s, %s@highest\n", ppc_reg(3), asm_name("__wine_spec_file_name") );
+            output( "\tori %s, %s, %s@higher\n", ppc_reg(3), ppc_reg(3), asm_name("__wine_spec_file_name") );
+            output( "\trldicr %s, %s, 32, 31\n", ppc_reg(3), ppc_reg(3) );
+            output( "\toris %s, %s, %s@high\n", ppc_reg(3), ppc_reg(3), asm_name("__wine_spec_file_name") );
+            output( "\tori %s, %s, %s@l\n", ppc_reg(3), ppc_reg(3), asm_name("__wine_spec_file_name") );
+            if (exp_name)
+            {
+                output( "\tlis %s, .L%s_string@highest\n", ppc_reg(4), name );
+                output( "\tori %s, %s, .L%s_string@higher\n", ppc_reg(4), ppc_reg(4), name );
+                output( "\trldicr %s, %s, 32, 31\n", ppc_reg(4), ppc_reg(4) );
+                output( "\toris %s, %s, .L%s_string@high\n", ppc_reg(4), ppc_reg(4), name );
+                output( "\tori %s, %s, .L%s_string@l\n", ppc_reg(4), ppc_reg(4), name );
+                count++;
+            }
+            else
+            {
+                output( "\tlis %s, %u@highest\n", ppc_reg(4), odp->ordinal );
+                output( "\tori %s, %s, %u@higher\n", ppc_reg(4), ppc_reg(4), odp->ordinal );
+                output( "\trldicr %s, %s, 32, 31\n", ppc_reg(4), ppc_reg(4) );
+                output( "\toris %s, %s, %u@high\n", ppc_reg(4), ppc_reg(4), odp->ordinal );
+                output( "\tori %s, %s, %u@l\n", ppc_reg(4), ppc_reg(4), odp->ordinal );
+            }
+            output( "\tbl %s\n", asm_name("__wine_spec_unimplemented_stub") );
             break;
         default:
             assert(0);

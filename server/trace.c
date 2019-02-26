@@ -137,6 +137,7 @@ static void dump_cpu_type( const char *prefix, const cpu_type_t *code )
         CASE(x86);
         CASE(x86_64);
         CASE(POWERPC);
+        CASE(POWERPC64);
         CASE(ARM);
         CASE(ARM64);
         default: fprintf( stderr, "%s%u", prefix, *code ); break;
@@ -655,6 +656,26 @@ static void dump_varargs_context( const char *prefix, data_size_t size )
         {
             for (i = 0; i < 32; i++) fprintf( stderr, ",fpr%u=%g", i, ctx.fp.powerpc_regs.fpr[i] );
             fprintf( stderr, ",fpscr=%g", ctx.fp.powerpc_regs.fpscr );
+        }
+        break;
+    case CPU_POWERPC64:
+        if (ctx.flags & SERVER_CTX_CONTROL)
+            fprintf( stderr, ",iar=%016x,msr=%016x,ctr=%016x,lr=%016x,dar=%016x,dsisr=%016x,trap=%016x",
+                     ctx.ctl.powerpc64_regs.iar, ctx.ctl.powerpc64_regs.msr, ctx.ctl.powerpc64_regs.ctr,
+                     ctx.ctl.powerpc64_regs.lr, ctx.ctl.powerpc64_regs.dar, ctx.ctl.powerpc64_regs.dsisr,
+                     ctx.ctl.powerpc64_regs.trap );
+        if (ctx.flags & SERVER_CTX_INTEGER)
+        {
+            for (i = 0; i < 32; i++) fprintf( stderr, ",gpr%u=%016x", i, ctx.integer.powerpc64_regs.gpr[i] );
+            fprintf( stderr, ",cr=%08x,xer=%08x",
+                     ctx.integer.powerpc64_regs.cr, ctx.integer.powerpc64_regs.xer );
+        }
+        if (ctx.flags & SERVER_CTX_DEBUG_REGISTERS)
+            for (i = 0; i < 8; i++) fprintf( stderr, ",dr%u=%016x", i, ctx.debug.powerpc64_regs.dr[i] );
+        if (ctx.flags & SERVER_CTX_FLOATING_POINT)
+        {
+            for (i = 0; i < 32; i++) fprintf( stderr, ",fpr%u=%g", i, ctx.fp.powerpc64_regs.fpr[i] );
+            fprintf( stderr, ",fpscr=%g", ctx.fp.powerpc64_regs.fpscr );
         }
         break;
     case CPU_ARM:

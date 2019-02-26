@@ -180,7 +180,7 @@ __ASM_GLOBAL_FUNC(interlocked_cmpxchg128,
                   __ASM_CFI(".cfi_same_value %rbx\n\t")
                   "ret")
 
-#elif defined(__powerpc__)
+#elif defined(__powerpc__) && !defined(__powerpc64__)
 
 #if !(defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) && __SIZEOF_POINTER__ == 4) \
  && !(defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8) && __SIZEOF_POINTER__ == 8)
