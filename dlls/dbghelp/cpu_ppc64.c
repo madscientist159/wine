@@ -31,29 +31,127 @@ WINE_DEFAULT_DEBUG_CHANNEL(dbghelp);
 static BOOL ppc64_get_addr(HANDLE hThread, const CONTEXT* ctx,
                          enum cpu_addr ca, ADDRESS64* addr)
 {
+   addr->Mode    = AddrModeFlat;
+   addr->Segment = 0; /* don't need segment */
    switch (ca)
     {
 #if defined(__powerpc64__)
-    case cpu_addr_pc:
-        addr->Mode    = AddrModeFlat;
-        addr->Segment = 0; /* don't need segment */
-        addr->Offset  = ctx->Iar;
-        return TRUE;
+    case cpu_addr_pc:     addr->Offset = ctx->Iar; return TRUE;
+    case cpu_addr_stack:  addr->Offset = ctx->Gpr1; return TRUE;
+    case cpu_addr_frame:  addr->Offset = ctx->Fp; return TRUE;
 #endif
     default:
-    case cpu_addr_stack:
-    case cpu_addr_frame:
-        FIXME("not done\n");
+        addr->Mode = -1;
+        return FALSE;
     }
-    return FALSE;
 }
 
+#if defined(__powerpc64__)
+enum st_mode {stm_start, stm_ppc64, stm_done};
+
+/* indexes in Reserved array */
+#define __CurrentModeCount      0
+
+#define curr_mode   (frame->Reserved[__CurrentModeCount] & 0x0F)
+#define curr_count  (frame->Reserved[__CurrentModeCount] >> 4)
+
+#define set_curr_mode(m) {frame->Reserved[__CurrentModeCount] &= ~0x0F; frame->Reserved[__CurrentModeCount] |= (m & 0x0F);}
+#define inc_curr_count() (frame->Reserved[__CurrentModeCount] += 0x10)
+
+/* fetch_next_frame()
+ *
+ * modify (at least) context.Iar using unwind information
+ * either out of debug info (dwarf), or simple Lr trace
+ */
+static BOOL fetch_next_frame(struct cpu_stack_walk* csw, union ctx *pcontext,
+    DWORD_PTR curr_pc)
+{
+    DWORD64 xframe;
+    CONTEXT *context = &pcontext->ctx;
+    DWORD_PTR               oldReturn = context->Lr;
+
+    if (dwarf2_virtual_unwind(csw, curr_pc, pcontext, &xframe))
+    {
+        context->Gpr1 = xframe;
+        context->Iar = oldReturn;
+        return TRUE;
+    }
+
+    if (context->Iar == context->Lr) return FALSE;
+    context->Iar = oldReturn;
+
+    return TRUE;
+}
+
+static BOOL ppc64_stack_walk(struct cpu_stack_walk *csw, STACKFRAME64 *frame,
+    union ctx *context)
+{
+    unsigned deltapc = curr_count <= 1 ? 0 : 4;
+
+    /* sanity check */
+    if (curr_mode >= stm_done) return FALSE;
+
+    TRACE("Enter: PC=%s Frame=%s Return=%s Stack=%s Mode=%s Count=%s\n",
+          wine_dbgstr_addr(&frame->AddrPC),
+          wine_dbgstr_addr(&frame->AddrFrame),
+          wine_dbgstr_addr(&frame->AddrReturn),
+          wine_dbgstr_addr(&frame->AddrStack),
+          curr_mode == stm_start ? "start" : "PPC64",
+          wine_dbgstr_longlong(curr_count));
+
+    if (curr_mode == stm_start)
+    {
+        /* Init done */
+        set_curr_mode(stm_ppc64);
+        frame->AddrReturn.Mode = frame->AddrStack.Mode = AddrModeFlat;
+        /* don't set up AddrStack on first call. Either the caller has set it up, or
+         * we will get it in the next frame
+         */
+        memset(&frame->AddrBStore, 0, sizeof(frame->AddrBStore));
+    }
+    else
+    {
+        if (context->ctx.Gpr1 != frame->AddrStack.Offset) FIXME("inconsistent Stack Pointer\n");
+        if (context->ctx.Iar != frame->AddrPC.Offset) FIXME("inconsistent Program Counter\n");
+
+        if (frame->AddrReturn.Offset == 0) goto done_err;
+        if (!fetch_next_frame(csw, context, frame->AddrPC.Offset - deltapc))
+            goto done_err;
+    }
+
+    memset(&frame->Params, 0, sizeof(frame->Params));
+
+    /* set frame information */
+    frame->AddrStack.Offset = context->ctx.Gpr1;
+    frame->AddrReturn.Offset = context->ctx.Lr;
+    frame->AddrFrame.Offset = context->ctx.Fp;
+    frame->AddrPC.Offset = context->ctx.Iar;
+
+    frame->Far = TRUE;
+    frame->Virtual = TRUE;
+    inc_curr_count();
+
+    TRACE("Leave: PC=%s Frame=%s Return=%s Stack=%s Mode=%s Count=%s FuncTable=%p\n",
+          wine_dbgstr_addr(&frame->AddrPC),
+          wine_dbgstr_addr(&frame->AddrFrame),
+          wine_dbgstr_addr(&frame->AddrReturn),
+          wine_dbgstr_addr(&frame->AddrStack),
+          curr_mode == stm_start ? "start" : "PPC64",
+          wine_dbgstr_longlong(curr_count),
+          frame->FuncTableEntry);
+
+    return TRUE;
+done_err:
+    set_curr_mode(stm_done);
+    return FALSE;
+}
+#else
 static BOOL ppc64_stack_walk(struct cpu_stack_walk* csw, STACKFRAME64 *frame,
     union ctx *ctx)
 {
-    FIXME("not done\n");
     return FALSE;
 }
+#endif
 
 static unsigned ppc64_map_dwarf_register(unsigned regno, BOOL eh_frame)
 {

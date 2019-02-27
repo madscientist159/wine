@@ -96,6 +96,9 @@ static pthread_key_t teb_key;
 
 #endif /* linux */
 
+static const size_t teb_size = 0x20000;  /* we reserve two pages for the TEB */
+static size_t signal_stack_size;
+
 typedef int (*wine_signal_handler)(unsigned int sig);
 
 static wine_signal_handler handlers[256];
@@ -107,6 +110,16 @@ static inline int dispatch_signal(unsigned int sig)
 {
     if (handlers[sig] == NULL) return 0;
     return handlers[sig](sig);
+}
+
+/*******************************************************************
+ *         is_valid_frame
+ */
+static inline BOOL is_valid_frame( void *frame )
+{
+    if ((ULONG_PTR)frame & 3) return FALSE;
+    return (frame >= NtCurrentTeb()->Tib.StackLimit &&
+            (void **)frame < (void **)NtCurrentTeb()->Tib.StackBase - 1);
 }
 
 /***********************************************************************
@@ -207,11 +220,67 @@ static inline void restore_fpu( CONTEXT *context, const ucontext_t *sigcontext )
 /***********************************************************************
  *		RtlCaptureContext (NTDLL.@)
  */
-void WINAPI RtlCaptureContext( CONTEXT *context )
-{
-    FIXME("not implemented\n");
-    memset( context, 0, sizeof(*context) );
-}
+/* FIXME: Use the Stack instead of the actual register values? */
+__ASM_STDCALL_FUNC( RtlCaptureContext, 8,
+                    "std 1, 0x10(3)\n\t"            /* context->Gpr1 */
+                    "stdu 1, -168(1)\n\t"           /* create stack frame */
+                    "std 4, 56(1)\n\t"              /* back up r4 */
+                    "lis 4, 0x80\n\t"               /* CONTEXT_PPC64 */
+                    "ori 4, 4, 0x7\n\t"             /* CONTEXT_FULL */
+                    "std 4, 0(3)\n\t"               /* context->ContextFlags */
+                    "mfcr 4\n\t"
+                    "std 4, 0x108(3)\n\t"           /* context->Cr */
+                    "mfxer 4\n\t"
+                    "std 4, 0x110(3)\n\t"           /* context->Xer */
+                    "mflr 4\n\t"
+                    "std 4, 0x130(3)\n\t"           /* context->Lr */
+                    "mfctr 4\n\t"
+                    "std 4, 0x138(3)\n\t"           /* context->Ctr */
+                    "ld 4, 56(1)\n\t"               /* restore r4 */
+                    "std 0, 0x8(3)\n\t"             /* context->Gpr0 */
+                    "std 2, 0x18(3)\n\t"            /* context->Gpr2 */
+                    "std 3, 0x20(3)\n\t"            /* context->Gpr3 */
+                    "std 4, 0x28(3)\n\t"            /* context->Gpr4 */
+                    "std 5, 0x30(3)\n\t"            /* context->Gpr5 */
+                    "std 6, 0x38(3)\n\t"            /* context->Gpr6 */
+                    "std 7, 0x40(3)\n\t"            /* context->Gpr7 */
+                    "std 8, 0x48(3)\n\t"            /* context->Gpr8 */
+                    "std 9, 0x50(3)\n\t"            /* context->Gpr9 */
+                    "std 10, 0x58(3)\n\t"           /* context->Gpr10 */
+                    "std 11, 0x60(3)\n\t"           /* context->Gpr11 */
+                    "std 12, 0x68(3)\n\t"           /* context->Gpr12 */
+                    "std 13, 0x70(3)\n\t"           /* context->Gpr13 */
+                    "std 14, 0x78(3)\n\t"           /* context->Gpr14 */
+                    "std 15, 0x80(3)\n\t"           /* context->Gpr15 */
+                    "std 16, 0x88(3)\n\t"           /* context->Gpr16 */
+                    "std 17, 0x90(3)\n\t"           /* context->Gpr17 */
+                    "std 18, 0x98(3)\n\t"           /* context->Gpr18 */
+                    "std 19, 0xa0(3)\n\t"           /* context->Gpr19 */
+                    "std 20, 0xa8(3)\n\t"           /* context->Gpr20 */
+                    "std 21, 0xb0(3)\n\t"           /* context->Gpr21 */
+                    "std 22, 0xb8(3)\n\t"           /* context->Gpr22 */
+                    "std 23, 0xc0(3)\n\t"           /* context->Gpr23 */
+                    "std 24, 0xc8(3)\n\t"           /* context->Gpr24 */
+                    "std 25, 0xd0(3)\n\t"           /* context->Gpr25 */
+                    "std 26, 0xd8(3)\n\t"           /* context->Gpr26 */
+                    "std 27, 0xe0(3)\n\t"           /* context->Gpr27 */
+                    "std 28, 0xe8(3)\n\t"           /* context->Gpr28 */
+                    "std 29, 0xf0(3)\n\t"           /* context->Gpr29 */
+                    "std 30, 0xf8(3)\n\t"           /* context->Gpr30 */
+                    "std 31, 0x100(3)\n\t"          /* context->Gpr31 */
+                    "lis 4, next_iar@highest\n\t"   /* get iar (or close enough) */
+                    "ori 4, 4, next_iar@higher\n\t"
+                    "rldicr 4, 4, 32, 31\n\t"
+                    "oris 4, 4, next_iar@high\n\t"
+                    "ori 4, 4, next_iar@l\n\t"
+                    "next_iar: std 4, 0x128(3)\n\t" /* context->Iar */
+                    "ld 4, 0(1)\n\t"                /* get return stack frame address */
+                    "ld 4, 0(4)\n\t"                /* get frame pointer */
+                    "std 4, 0x118(3)\n\t"           /* context->Fp */
+                    "ld 4, 56(1)\n\t"               /* restore r4 */
+                    "ld 1, 0(1)\n\t"                /* drop stack frame */
+                    "blr"
+                    )
 
 
 /***********************************************************************
@@ -592,14 +661,49 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
  */
 static NTSTATUS call_stack_handlers( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
-    EXCEPTION_POINTERS ptrs;
+    EXCEPTION_REGISTRATION_RECORD *frame, *dispatch, *nested_frame;
+    DWORD res;
 
-    FIXME( "not implemented on PowerPC 64\n" );
+    frame = NtCurrentTeb()->Tib.ExceptionList;
+    nested_frame = NULL;
+    while (frame != (EXCEPTION_REGISTRATION_RECORD*)~0UL)
+    {
+        /* Check frame address */
+        if (!is_valid_frame( frame ))
+        {
+            rec->ExceptionFlags |= EH_STACK_INVALID;
+            break;
+        }
 
-    /* hack: call unhandled exception filter directly */
-    ptrs.ExceptionRecord = rec;
-    ptrs.ContextRecord = context;
-    call_unhandled_exception_filter( &ptrs );
+        /* Call handler */
+        TRACE( "calling handler at %p code=%x flags=%x\n",
+               frame->Handler, rec->ExceptionCode, rec->ExceptionFlags );
+        res = frame->Handler( rec, frame, context, &dispatch );
+        TRACE( "handler at %p returned %x\n", frame->Handler, res );
+
+        if (frame == nested_frame)
+        {
+            /* no longer nested */
+            nested_frame = NULL;
+            rec->ExceptionFlags &= ~EH_NESTED_CALL;
+        }
+
+        switch(res)
+        {
+        case ExceptionContinueExecution:
+            if (!(rec->ExceptionFlags & EH_NONCONTINUABLE)) return STATUS_SUCCESS;
+            return STATUS_NONCONTINUABLE_EXCEPTION;
+        case ExceptionContinueSearch:
+            break;
+        case ExceptionNestedException:
+            if (nested_frame < dispatch) nested_frame = dispatch;
+            rec->ExceptionFlags |= EH_NESTED_CALL;
+            break;
+        default:
+            return STATUS_INVALID_DISPOSITION;
+        }
+        frame = frame->Prev;
+    }
     return STATUS_UNHANDLED_EXCEPTION;
 }
 
@@ -617,11 +721,11 @@ static NTSTATUS raise_exception( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL f
     {
         DWORD c;
 
-        TRACE( "code=%x flags=%x addr=%p ip=%llx tid=%04x\n",
+        TRACE( "code=%x flags=%x addr=%p pc=%llx tid=%04x\n",
                rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress,
                context->Iar, GetCurrentThreadId() );
         for (c = 0; c < rec->NumberParameters; c++)
-            TRACE( " info[%d]=%08llx\n", c, rec->ExceptionInformation[c] );
+            TRACE( " info[%d]=%016llx\n", c, rec->ExceptionInformation[c] );
         if (rec->ExceptionCode == EXCEPTION_WINE_STUB)
         {
             if (rec->ExceptionInformation[1] >> 16)
@@ -635,7 +739,24 @@ static NTSTATUS raise_exception( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL f
         }
         else
         {
-            /* FIXME: dump context */
+            TRACE(" GPR0=%016llx GPR1=%016llx GPR2=%016llx GPR3=%016llx\n",
+                  context->Gpr0, context->Gpr1, context->Gpr2, context->Gpr3 );
+            TRACE(" GPR4=%016llx GPR5=%016llx GPR6=%016llx GPR7=%016llx\n",
+                  context->Gpr4, context->Gpr5, context->Gpr6, context->Gpr7 );
+            TRACE(" GPR8=%016llx GPR9=%016llx GPR10=%016llx GPR11=%016llx\n",
+                  context->Gpr8, context->Gpr9, context->Gpr10, context->Gpr11 );
+            TRACE(" GPR12=%016llx GPR13=%016llx GPR14=%016llx GPR15=%016llx\n",
+                  context->Gpr12, context->Gpr13, context->Gpr14, context->Gpr15 );
+            TRACE(" GPR16=%016llx GPR17=%016llx GPR18=%016llx GPR19=%016llx\n",
+                  context->Gpr16, context->Gpr17, context->Gpr18, context->Gpr19 );
+            TRACE(" GPR20=%016llx GPR21=%016llx GPR22=%016llx GPR23=%016llx\n",
+                  context->Gpr20, context->Gpr21, context->Gpr22, context->Gpr23 );
+            TRACE(" GPR24=%016llx GPR25=%016llx GPR26=%016llx GPR27=%016llx\n",
+                  context->Gpr24, context->Gpr25, context->Gpr26, context->Gpr27 );
+            TRACE(" GPR28=%016llx GPR29=%016llx GPR30=%016llx GPR31=%016llx\n",
+                  context->Gpr28, context->Gpr29, context->Gpr30, context->Gpr31 );
+            TRACE(" pc=%016llx lr=%016llx sp=%016llx fp=%016llx \n",
+                  context->Iar, context->Lr, context->Gpr1, context->Fp );
         }
 
         status = send_debug_event( rec, TRUE, context );
@@ -692,6 +813,8 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         {
 	case SEGV_MAPERR:
 	case SEGV_ACCERR:
+	case SEGV_BNDERR:
+	case SEGV_PKUERR:
             rec.NumberParameters = 2;
             rec.ExceptionInformation[0] = 0; /* FIXME ? */
             rec.ExceptionInformation[1] = (ULONG_PTR)siginfo->si_addr;
@@ -789,20 +912,24 @@ static void trap_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     /* FIXME: check if we might need to modify PC */
     switch (siginfo->si_code & 0xffff)
     {
-#ifdef TRAP_BRKPT
-    case TRAP_BRKPT:
-        rec.ExceptionCode = EXCEPTION_BREAKPOINT;
-	break;
-#endif
 #ifdef TRAP_TRACE
     case TRAP_TRACE:
         rec.ExceptionCode = EXCEPTION_SINGLE_STEP;
 	break;
 #endif
+#ifdef TRAP_BRKPT
+    case TRAP_BRKPT:
     default:
-        FIXME("Unhandled SIGTRAP/%x\n", siginfo->si_code);
-        break;
+        rec.ExceptionCode = EXCEPTION_BREAKPOINT;
+	break;
+#endif
     }
+
+    save_context( &context, sigcontext );
+    rec.ExceptionFlags   = EXCEPTION_CONTINUABLE;
+    rec.ExceptionRecord  = NULL;
+    rec.ExceptionAddress = (LPVOID)context.Iar;
+    rec.NumberParameters = 0;
     status = raise_exception( &rec, &context, TRUE );
     if (status) raise_status( status, &rec );
     restore_context( &context, sigcontext );
@@ -975,10 +1102,12 @@ NTSTATUS signal_alloc_thread( TEB **teb )
 
     if (!sigstack_zero_bits)
     {
-        size_t min_size = page_size;  /* this is just for the TEB, we don't use a signal stack yet */
+        size_t min_size = teb_size + max( MINSIGSTKSZ, 0x20000 );
         /* find the first power of two not smaller than min_size */
+        sigstack_zero_bits = 16;
         while ((1u << sigstack_zero_bits) < min_size) sigstack_zero_bits++;
-        assert( sizeof(TEB) <= min_size );
+        signal_stack_size = (1 << sigstack_zero_bits) - teb_size;
+        assert( sizeof(TEB) <= teb_size );
     }
 
     size = 1 << sigstack_zero_bits;

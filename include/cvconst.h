@@ -495,6 +495,17 @@ enum CV_HREG_e
     CV_IA64_FltF0       = 2048, /* this includes FltF1 to FltF127 */
     /* some IA64 registers missing */
 
+    /* PPC64 CPU */
+    CV_PPC64_NOREG        = CV_REG_NONE,
+    CV_PPC64_GPR0         = 10, /* this includes GPR0 to GPR30 */
+    CV_PPC64_PC           = 42, /* Wine extension */
+    CV_PPC64_PSTATE       = 43, /* Wine extension */
+    CV_PPC64_IP0          = 66,
+    CV_PPC64_IP1          = 67,
+    CV_PPC64_FP           = 79,
+    CV_PPC64_LR           = 80,
+    CV_PPC64_SP           = 81,
+
     /* TriCore CPU */
     CV_TRI_NOREG        = CV_REG_NONE,
     CV_TRI_D0           = 10, /* includes D1 to D15 */

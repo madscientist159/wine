@@ -1991,10 +1991,12 @@ typedef struct _CONTEXT
 /* PowerPC 64-bit context definitions */
 #if defined(__powerpc64__)
 
-#define CONTEXT_CONTROL         0x0001
-#define CONTEXT_FLOATING_POINT  0x0002
-#define CONTEXT_INTEGER         0x0004
-#define CONTEXT_DEBUG_REGISTERS 0x0008
+#define CONTEXT_PPC64           0x800000
+#define CONTEXT_CONTROL         (CONTEXT_PPC64 | 0x00000001)
+#define CONTEXT_FLOATING_POINT  (CONTEXT_PPC64 | 0x00000002)
+#define CONTEXT_INTEGER         (CONTEXT_PPC64 | 0x00000004)
+#define CONTEXT_DEBUG_REGISTERS (CONTEXT_PPC64 | 0x00000008)
+
 #define CONTEXT_FULL (CONTEXT_CONTROL | CONTEXT_FLOATING_POINT | CONTEXT_INTEGER)
 #define CONTEXT_ALL (CONTEXT_CONTROL | CONTEXT_INTEGER | \
         CONTEXT_FLOATING_POINT | CONTEXT_DEBUG_REGISTERS)
@@ -2005,6 +2007,60 @@ typedef struct _CONTEXT
 
 typedef struct
 {
+    ULONG ContextFlags;                 /* 000 */
+    /* CONTEXT_INTEGER */
+    ULONG DUMMY_PADDING;                /* 004 */
+    union
+    {
+        struct
+        {
+            DWORD64 Gpr0;               /* 008 */
+            DWORD64 Gpr1;               /* 010 */
+            DWORD64 Gpr2;               /* 018 */
+            DWORD64 Gpr3;               /* 020 */
+            DWORD64 Gpr4;               /* 028 */
+            DWORD64 Gpr5;               /* 030 */
+            DWORD64 Gpr6;               /* 038 */
+            DWORD64 Gpr7;               /* 040 */
+            DWORD64 Gpr8;               /* 048 */
+            DWORD64 Gpr9;               /* 050 */
+            DWORD64 Gpr10;              /* 058 */
+            DWORD64 Gpr11;              /* 060 */
+            DWORD64 Gpr12;              /* 068 */
+            DWORD64 Gpr13;              /* 070 */
+            DWORD64 Gpr14;              /* 078 */
+            DWORD64 Gpr15;              /* 080 */
+            DWORD64 Gpr16;              /* 088 */
+            DWORD64 Gpr17;              /* 090 */
+            DWORD64 Gpr18;              /* 098 */
+            DWORD64 Gpr19;              /* 0a0 */
+            DWORD64 Gpr20;              /* 0a8 */
+            DWORD64 Gpr21;              /* 0b0 */
+            DWORD64 Gpr22;              /* 0b8 */
+            DWORD64 Gpr23;              /* 0c0 */
+            DWORD64 Gpr24;              /* 0c8 */
+            DWORD64 Gpr25;              /* 0d0 */
+            DWORD64 Gpr26;              /* 0d8 */
+            DWORD64 Gpr27;              /* 0e0 */
+            DWORD64 Gpr28;              /* 0e8 */
+            DWORD64 Gpr29;              /* 0f0 */
+            DWORD64 Gpr30;              /* 0f8 */
+            DWORD64 Gpr31;              /* 0100 */
+
+            DWORD64 Cr;                 /* 0108 */
+            DWORD64 Xer;                /* 0110 */
+            /* Synthetic -- read from *(Gpr1) */
+            DWORD64 Fp;                 /* 0118 */
+        } DUMMYSTRUCTNAME;
+        DWORD64 X[31];                  /* 008 */
+    } DUMMYUNIONNAME;
+
+    /* CONTEXT_CONTROL */
+    DWORD64 Msr;                        /* 120 */
+    DWORD64 Iar;                        /* 128 */
+    DWORD64 Lr;                         /* 130 */
+    DWORD64 Ctr;                        /* 138 */
+
     /* These are selected by CONTEXT_FLOATING_POINT */
     double Fpr0;
     double Fpr1;
@@ -2039,51 +2095,6 @@ typedef struct
     double Fpr30;
     double Fpr31;
     double Fpscr;
-
-    /* These are selected by CONTEXT_INTEGER */
-    DWORD64 Gpr0;
-    DWORD64 Gpr1;
-    DWORD64 Gpr2;
-    DWORD64 Gpr3;
-    DWORD64 Gpr4;
-    DWORD64 Gpr5;
-    DWORD64 Gpr6;
-    DWORD64 Gpr7;
-    DWORD64 Gpr8;
-    DWORD64 Gpr9;
-    DWORD64 Gpr10;
-    DWORD64 Gpr11;
-    DWORD64 Gpr12;
-    DWORD64 Gpr13;
-    DWORD64 Gpr14;
-    DWORD64 Gpr15;
-    DWORD64 Gpr16;
-    DWORD64 Gpr17;
-    DWORD64 Gpr18;
-    DWORD64 Gpr19;
-    DWORD64 Gpr20;
-    DWORD64 Gpr21;
-    DWORD64 Gpr22;
-    DWORD64 Gpr23;
-    DWORD64 Gpr24;
-    DWORD64 Gpr25;
-    DWORD64 Gpr26;
-    DWORD64 Gpr27;
-    DWORD64 Gpr28;
-    DWORD64 Gpr29;
-    DWORD64 Gpr30;
-    DWORD64 Gpr31;
-
-    DWORD64 Cr;
-    DWORD64 Xer;
-
-    /* These are selected by CONTEXT_CONTROL */
-    DWORD64 Msr;
-    DWORD64 Iar; /* Instruction Address Register , aka PC ... */
-    DWORD64 Lr;
-    DWORD64 Ctr;
-
-    DWORD64 ContextFlags;
 
     DWORD64 Dar;   /* Fault registers for coredump */
     DWORD64 Dsisr;
